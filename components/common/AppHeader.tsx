@@ -11,6 +11,7 @@ interface AppHeaderProps {
   onRightPress?: () => void;
   rightIconName?: string;
   showBackButton?: boolean;
+  onMenuPress?: () => void;
 }
 
 const Header = styled.View`

@@ -4,18 +4,18 @@ import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
 // Componentes reutilizables
-import AppHeader from '../components/common/AppHeader';
-import SearchBar from '../components/common/SearchBar';
-import FilterButtons from '../components/common/FilterButtons';
-import ResponsiveGrid from '../components/grids/ResponsiveGrid';
-import StatsGrid from '../components/dashboard/StatsGrid';
-import EspacioCard from '../components/cards/EspacioCard';
-import AppModal from '../components/common/AppModal';
-import { Container } from '../components/shared/StyledComponents';
+import AppHeader from '../../components/common/AppHeader';
+import SearchBar from '../../components/common/SearchBar';
+import FilterButtons from '../../components/common/FilterButtons';
+import ResponsiveGrid from '../../components/grids/ResponsiveGrid';
+import StatsGrid from '../../components/dashboard/StatsGrid';
+import EspacioCard from '../../components/cards/EspacioCard';
+import AppModal from '../../components/common/AppModal';
+import { Container } from '../../components/shared/StyledComponents';
 
 // Constantes
-import { colors } from '../constants/colors';
-import { getResponsiveSize, getDynamicSpacing } from '../utils/ResponsiveUtils';
+import { colors } from '../../constants/colors';
+import { getResponsiveSize, getDynamicSpacing } from '../../utils/ResponsiveUtils';
 
 // Styled components para el modal (SIN estilos inline)
 import styled from 'styled-components/native';

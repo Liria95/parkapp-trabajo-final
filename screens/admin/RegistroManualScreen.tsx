@@ -5,23 +5,23 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import styled from 'styled-components/native';
 
 // Componentes reutilizables
-import AppHeader from '../components/common/AppHeader';
-import ScannerSection from '../components/registration/ScannerSection';
-import FormContainer from '../components/common/FormContainer';
-import InputField from '../components/common/InputField';
-import LocationCard from '../components/registration/LocationCard';
-import UserFoundCard from '../components/registration/UserFoundCard';
-import ToggleSwitch from '../components/common/ToggleSwitch';
-import AuthButton from '../components/common/AuthButton';
-import AppModal from '../components/common/AppModal';
-import { Container } from '../components/shared/StyledComponents';
+import AppHeader from '../../components/common/AppHeader';
+import ScannerSection from '../../components/registration/ScannerSection';
+import FormContainer from '../../components/common/FormContainer';
+import InputField from '../../components/common/InputField';
+import LocationCard from '../../components/registration/LocationCard';
+import UserFoundCard from '../../components/registration/UserFoundCard';
+import ToggleSwitch from '../../components/common/ToggleSwitch';
+import AuthButton from '../../components/common/AuthButton';
+import AppModal from '../../components/common/AppModal';
+import { Container } from '../../components/shared/StyledComponents';
 
 // Constantes
-import { colors } from '../constants/colors';
-import { getResponsiveSize, getDynamicSpacing } from '../utils/ResponsiveUtils';
+import { colors } from '../../constants/colors';
+import { getResponsiveSize, getDynamicSpacing } from '../../utils/ResponsiveUtils';
 
 // Hooks
-import { useFormValidation } from '../hooks/useFormValidation';
+import { useFormValidation } from '../../hooks/useFormValidation';
 
 // Tipos
 type RootStackParamList = {

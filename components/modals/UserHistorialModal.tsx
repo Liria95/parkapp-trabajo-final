@@ -4,7 +4,6 @@ import { colors } from '../../constants/colors';
 import { getResponsiveSize, getDynamicSpacing } from '../../utils/ResponsiveUtils';
 
 interface Usuario {
-  id: string;
   nombre: string;
   email: string;
   patente: string;
@@ -15,6 +14,7 @@ interface Usuario {
   fechaRegistro: string;
   ultimaActividad: string;
 }
+
 
 interface UserHistorialModalProps {
   usuario: Usuario;

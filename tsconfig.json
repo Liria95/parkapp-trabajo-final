@@ -5,6 +5,10 @@
     "jsx": "react-jsx",
     "moduleResolution": "bundler",
     "strict": true,
+    "paths": {
+      
+
+    },
     "esModuleInterop": true,
     "allowSyntheticDefaultImports": true,
     "skipLibCheck": true,

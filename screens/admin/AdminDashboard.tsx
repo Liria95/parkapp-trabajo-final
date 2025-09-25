@@ -3,17 +3,18 @@ import { ScrollView, Alert } from 'react-native';
 import styled from 'styled-components/native';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { useFocusEffect } from '@react-navigation/native';
 
 // Componentes reutilizables
-import DashboardHeader from '../components/dashboard/DashboardHeader';
-import StatsGrid from '../components/dashboard/StatsGrid';
-import SectionCard from '../components/dashboard/SectionCard';
-import ChartPlaceholder from '../components/dashboard/ChartPlaceholder';
-import UserList from '../components/dashboard/UserList';
-import BottomTabNavigation from '../components/navigation/BottomTabNavigation';
+import DashboardHeader from '../../components/dashboard/DashboardHeader';
+import StatsGrid from '../../components/dashboard/StatsGrid';
+import SectionCard from '../../components/dashboard/SectionCard';
+import ChartPlaceholder from '../../components/dashboard/ChartPlaceholder';
+import UserList from '../../components/dashboard/UserList';
+import BottomTabNavigation from '../../components/navigation/BottomTabNavigation';
 
 // Constantes
-import { colors } from '../constants/colors';
+import { colors } from '../../constants/colors';
 
 // Tipos
 type RootStackParamList = {
@@ -21,6 +22,7 @@ type RootStackParamList = {
   Infracciones: undefined;
   GestionUsuarios: undefined;
   Espacios: undefined;
+  AdminDrawer: undefined;
 };
 
 type AdminDashboardNavigationProp = NativeStackNavigationProp<
@@ -52,6 +54,12 @@ const Container = styled.SafeAreaView`
 const AdminDashboard: React.FC = () => {
   const navigation = useNavigation<AdminDashboardNavigationProp>();
   const [activeTab, setActiveTab] = useState<string>('dashboard');
+
+  useFocusEffect(
+    React.useCallback(() => {
+      setActiveTab('dashboard');
+    }, [])
+  );
 
   const [stats] = useState<DashboardStats>({
     occupiedSpaces: 156,
@@ -117,6 +125,12 @@ const AdminDashboard: React.FC = () => {
       onPress: () => handleNavigation('dashboard'),
     },
     {
+      id: 'admindrawer',
+      label: 'ADMIN',
+      iconName: 'briefcase-outline',
+      onPress: () => handleNavigation('admindrawer'),
+    },
+    {
       id: 'espacios',
       label: 'ESPACIOS',
       iconName: 'car-outline',
@@ -142,45 +156,39 @@ const AdminDashboard: React.FC = () => {
   };
 
   const handleNavigation = (section: string) => {
-    setActiveTab(section);
-    
-    if (section === 'usuarios') {
-      navigation.navigate('GestionUsuarios');
-    } else if (section === 'espacios') {
-      navigation.navigate('Espacios');
+    if (section === activeTab) {
+      return;
     }
+
+    setActiveTab(section);
+    switch (section) {
+      case 'usuarios':
+        navigation.navigate('GestionUsuarios');
+        break;
+      case 'espacios':
+        navigation.navigate('Espacios');
+        break;
+      case 'admindrawer':
+        navigation.navigate('AdminDrawer');
+        break;
+      default:
+        console.warn(`Sección desconocida: ${section}`);
+    }
+
   };
 
   return (
     <Container>
-      <DashboardHeader
-        title="Admin - Sistema ParkApp"
-        subtitle="Dashboard General"
-        onMenuPress={handleMenuPress}
-      />
-
-      <ScrollView 
-        showsVerticalScrollIndicator={false} 
-        contentContainerStyle={{ flexGrow: 1 }}
-      >
+      <DashboardHeader title="Admin - Sistema ParkApp" subtitle="Dashboard General" onMenuPress={handleMenuPress} />
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ flexGrow: 1 }} >
         <StatsGrid stats={statsConfig} />
-
-        <SectionCard title="Gráfico de ocupación">
-          <ChartPlaceholder
-            iconName="bar-chart-outline"
-            title="Actividad en Tiempo Real"
-          />
+    
+        <SectionCard title="Gráfico de ocupación"> <ChartPlaceholder iconName="bar-chart-outline" title="Actividad en Tiempo Real" />
         </SectionCard>
 
         <SectionCard
-          title="Usuarios Activos"
-          actionText="VER TODOS"
-          onActionPress={() => navigation.navigate('GestionUsuarios')}
-        >
-          <UserList
-            users={activeUsers}
-            onUserAction={handleUserAction}
-          />
+          title="Usuarios Activos" actionText="VER TODOS" onActionPress={() => navigation.navigate('GestionUsuarios')} >
+          <UserList users={activeUsers} onUserAction={handleUserAction} />
         </SectionCard>
       </ScrollView>
 

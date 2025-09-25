@@ -8,7 +8,7 @@ interface SectionCardProps {
   title: string;
   actionText?: string;
   onActionPress?: () => void;
-  children: React.ReactNode;
+  children?: React.ReactNode;
 }
 
 const Card = styled.View`
@@ -41,28 +41,34 @@ const Title = styled.Text`
 `;
 
 const SectionCard: React.FC<SectionCardProps> = ({
-  title,
+  title = 'Sin título',
   actionText,
   onActionPress,
-  children,
+  children = null,
 }) => {
+  // Opcional: log para depuración
+  // console.log('SectionCard props', { title, actionText, children });
+
   return (
     <Card>
       <Header>
         <Title>{title}</Title>
         {actionText && onActionPress && (
           <TouchableOpacity onPress={onActionPress}>
-            <Text style={{ 
-              color: colors.primary, 
-              fontSize: getResponsiveSize(12), 
-              fontWeight: 'bold' 
-            }}>
+            <Text
+              style={{
+                color: colors.primary,
+                fontSize: getResponsiveSize(12),
+                fontWeight: 'bold',
+              }}
+            >
               {actionText}
             </Text>
           </TouchableOpacity>
         )}
       </Header>
-      {children}
+      {/* Render condicional para evitar errores si children es undefined */}
+      {children ? children : null}
     </Card>
   );
 };

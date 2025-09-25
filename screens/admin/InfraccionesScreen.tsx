@@ -6,16 +6,16 @@ import { Ionicons } from '@expo/vector-icons';
 import styled from 'styled-components/native';
 
 // Componentes reutilizables
-import AppHeader from '../components/common/AppHeader';
-import FilterSection from '../components/common/FilterSection';
-import SectionHeader from '../components/common/SectionHeader';
-import InfractionCard from '../components/infractions/InfractionCard';
-import CreateInfractionModal from '../components/infractions/CreateInfractionModal';
-import { Container } from '../components/shared/StyledComponents';
+import AppHeader from '../../components/common/AppHeader';
+import FilterSection from '../../components/common/FilterSection';
+import SectionHeader from '../../components/common/SectionHeader';
+import InfractionCard from '../../components/infractions/InfractionCard';
+import CreateInfractionModal from '../../components/infractions/CreateInfractionModal';
+import { Container } from '../../components/shared/StyledComponents';
 
 // Constantes y utils
-import { colors } from '../constants/colors';
-import { getDynamicSpacing, breakpoints } from '../utils/ResponsiveUtils';
+import { colors } from '../../constants/colors';
+import { getDynamicSpacing, breakpoints } from '../../utils/ResponsiveUtils';
 
 // Tipos
 type RootStackParamList = {

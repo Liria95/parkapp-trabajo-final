@@ -4,23 +4,21 @@ import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
 // Componentes reutilizables
-import AppHeader from '../components/common/AppHeader';
-import SearchBar from '../components/common/SearchBar';
-import FilterButtons from '../components/common/FilterButtons';
-import ResponsiveGrid from '../components/grids/ResponsiveGrid';
-import UserDetailCard from '../components/cards/UserDetailCard';
-import AppModal from '../components/common/AppModal';
-import FormContainer from '../components/common/FormContainer';
-import InputField from '../components/common/InputField';
-import AuthButton from '../components/common/AuthButton';
-import { Container } from '../components/shared/StyledComponents';
-import UserHistorialModal from '../components/modals/UserHistorialModal';
+import AppHeader from '../../components/common/AppHeader';
+import SearchBar from '../../components/common/SearchBar';
+import FilterButtons from '../../components/common/FilterButtons';
+import ResponsiveGrid from '../../components/grids/ResponsiveGrid';
+import UserDetailCard from '../../components/cards/UserDetailCard';
+import AppModal from '../../components/common/AppModal';
+import FormContainer from '../../components/common/FormContainer';
+import InputField from '../../components/common/InputField';
+import AuthButton from '../../components/common/AuthButton';
+import { Container } from '../../components/shared/StyledComponents';
+import UserHistorialModal from '../../components/modals/UserHistorialModal';
 
-// Constantes
-import { colors } from '../constants/colors';
 
 // Hooks
-import { useFormValidation } from '../hooks/useFormValidation';
+import { useFormValidation } from '../../hooks/useFormValidation';
 
 // Tipos
 type RootStackParamList = {
