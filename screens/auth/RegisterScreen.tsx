@@ -1,9 +1,6 @@
 import React, { useState } from 'react';
 import { Alert } from 'react-native';
-import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { RootStackParamList } from '../../App';
 import {colors} from '../../utils';
-
 
 // Componentes reutilizables
 import AuthContainer from '../../components/auth/AuthContainer';
@@ -17,19 +14,10 @@ import LinkButton from '../../components/common/LinkButton';
 import { useFormValidation } from '../../hooks/useFormValidation';
 import { AuthService } from '../../services/AuthService';
 
-// Tipos para navegación
-type RegisterScreenNavigationProp = NativeStackNavigationProp<
-  RootStackParamList,
-  'Register'
->;
-
-interface RegisterScreenProps {
-  navigation: RegisterScreenNavigationProp;
-}
-
-const RegisterScreen: React.FC<RegisterScreenProps> = ({ navigation }) => {
+const RegisterScreen = ({ navigation }: any) => {
   const [formData, setFormData] = useState({
-    fullName: '',
+    name: '',
+    surname: '',
     email: '',
     phone: '',
     password: '',
@@ -48,7 +36,8 @@ const RegisterScreen: React.FC<RegisterScreenProps> = ({ navigation }) => {
 
   const handleRegister = async (): Promise<void> => {
     const isValid = validateForm(formData, {
-      fullName: { required: true, minLength: 2 },
+      name: { required: true, minLength: 2 },
+      surname: { required: true, minLength: 2 },
       email: { required: true, email: true },
       phone: { required: true, phone: true },
       password: { required: true, minLength: 6 },
@@ -60,9 +49,10 @@ const RegisterScreen: React.FC<RegisterScreenProps> = ({ navigation }) => {
       
       try {
         const result = await AuthService.register({
-          fullName: formData.fullName,
-          email: formData.email,
-          phone: formData.phone,
+          name: formData.name.trim(),
+          surname: formData.surname.trim(),
+          email: formData.email.trim(),
+          phone: formData.phone.trim(),
           password: formData.password,
         });
 
@@ -92,12 +82,22 @@ const RegisterScreen: React.FC<RegisterScreenProps> = ({ navigation }) => {
       
       <FormContainer>
         <InputField
-          label="Nombre completo"
+          label="Nombre"
           iconName="person-outline"
-          placeholder="Juan Pérez"
-          value={formData.fullName}
-          onChangeText={(text) => handleInputChange('fullName', text)}
-          error={errors.fullName}
+          placeholder="Juan"
+          value={formData.name}
+          onChangeText={(text) => handleInputChange('name', text)}
+          error={errors.name}
+          autoCapitalize="words"
+        />
+
+        <InputField
+          label="Apellido"
+          iconName="person-outline"
+          placeholder="Pérez"
+          value={formData.surname}
+          onChangeText={(text) => handleInputChange('surname', text)}
+          error={errors.surname}
           autoCapitalize="words"
         />
 

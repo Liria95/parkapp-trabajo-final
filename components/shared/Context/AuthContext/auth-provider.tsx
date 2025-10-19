@@ -14,11 +14,11 @@ interface State {
     token: string | null,
     user: User | null,
     refreshToken: string | null,
-    isAuthenticated: boolean, // Agregar para facilitar la navegación
+    isAuthenticated: boolean,
 }
 
 const initialState: State = {
-    isLoading: true, // Cambiar a true para mostrar loading mientras verifica
+    isLoading: true,
     token: null,
     user: null, 
     refreshToken: null,
@@ -35,7 +35,6 @@ const AuthProvider = (props: any) => {
             case AUTH_ACTIONS.LOGIN:
                 console.log('Guardando usuario en SecureStore: ', payload.user);
                 if (payload?.user) {
-                    // Guardar todos los datos necesarios
                     setUser({
                         user: payload.user,
                         token: payload.token,
@@ -58,7 +57,7 @@ const AuthProvider = (props: any) => {
                     token: payload?.token ?? null,
                     refreshToken: payload?.refreshToken ?? null,
                     isAuthenticated: !!payload?.user,
-                    isLoading: false, // Terminar loading después de verificar
+                    isLoading: false,
                 };
 
             case AUTH_ACTIONS.LOGOUT:
@@ -66,7 +65,7 @@ const AuthProvider = (props: any) => {
                 deleteUser();
                 return {
                     ...initialState,
-                    isLoading: false, // No loading después de logout
+                    isLoading: false,
                 }
                 
             case AUTH_ACTIONS.SET_LOADING:
@@ -75,13 +74,28 @@ const AuthProvider = (props: any) => {
                     isLoading: payload
                 }
             
+            // ← AGREGAR ESTE CASO NUEVO
+            case AUTH_ACTIONS.UPDATE_USER:
+                console.log('Actualizando usuario:', payload);
+                // Actualizar también en SecureStore
+                if (payload) {
+                    setUser({
+                        user: payload,
+                        token: prevState.token ?? undefined,
+                        refreshToken: prevState.refreshToken ?? undefined,
+                    });
+                }
+                return {
+                    ...prevState,
+                    user: payload ?? null,
+                };
+            
             default:
                 return prevState
         }
     }, initialState);
 
     useEffect(() => {
-        // Restaurar sesión desde SecureStore
         const restoreSession = async () => {
             try {
                 dispatch({ type: AUTH_ACTIONS.SET_LOADING, payload: true });
@@ -90,7 +104,6 @@ const AuthProvider = (props: any) => {
                 console.log('Usuario recuperado de SecureStore:', userData);
                 
                 if (userData && userData.user) {
-                    // Si hay datos guardados, restaurar la sesión
                     dispatch({ 
                         type: AUTH_ACTIONS.SET_USER, 
                         payload: {
@@ -100,7 +113,6 @@ const AuthProvider = (props: any) => {
                         }
                     });
                 } else {
-                    // No hay sesión guardada
                     dispatch({  
                         type: AUTH_ACTIONS.SET_USER, 
                         payload: { user: null }

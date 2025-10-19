@@ -1,5 +1,5 @@
 import React, { useContext } from "react";
-import { View, Text, StyleSheet, ScrollView } from "react-native";
+import { View, Text, StyleSheet, ScrollView, Alert } from "react-native";
 import colores from "../../constantes/colores";
 import InfoUsuario from "./InfoUsuario";
 import OpcionMenu from "./OpcionMenu";
@@ -11,10 +11,13 @@ export default function Perfil() {
   const { dispatch, state } = useContext(AuthContext);
 
   const usuario = {
-    nombre: state.user?.nombre || "Usuario",
+    nombre: state.user?.name || "Usuario",
+    apellido: state.user?.surname || "",
     email: state.user?.email || "usuario@email.com",
     avatar: state.user?.avatar || ""
   };
+
+  const nombreCompleto = `${usuario.nombre} ${usuario.apellido}`.trim();
 
   const opcionesMenu = [
     { id: 1, titulo: "Mis vehículos", icono: "car-sport" as const },
@@ -28,8 +31,67 @@ export default function Perfil() {
     console.log("Navegando a:", titulo);
   };
 
+  // SUBIR FOTO AL SERVIDOR
+  const handleAvatarChange = async (uri: string) => {
+    try {
+      console.log('📷 Nueva foto seleccionada:', uri);
+
+      // Crear FormData para subir la imagen
+      const formData = new FormData();
+      formData.append('photo', {
+        uri,
+        type: 'image/jpeg',
+        name: 'profile.jpg',
+      } as any);
+
+      console.log('📤 Subiendo foto al servidor...');
+
+      // Subir al servidor
+      const response = await fetch('http://192.168.1.5:3000/api/user/profile-photo', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${state.token}`,
+        },
+        body: formData,
+      });
+
+      const data = await response.json();
+      console.log('📥 Respuesta del servidor:', data);
+
+      if (data.success) {
+        Alert.alert('Éxito', 'Foto de perfil actualizada');
+
+        // Actualizar contexto con la URL de Cloudinary
+        dispatch({
+          type: AUTH_ACTIONS.UPDATE_USER,
+          payload: {
+            ...state.user,
+            avatar: data.photoUrl,
+          },
+        });
+      } else {
+        Alert.alert('Error', data.message || 'No se pudo actualizar la foto');
+      }
+
+    } catch (error) {
+      console.error('❌ Error al subir foto:', error);
+      Alert.alert('Error', 'No se pudo conectar con el servidor. Verifica que esté corriendo.');
+    }
+  };
+
   const handleCerrarSesion = () => {
-    dispatch({ type: AUTH_ACTIONS.LOGOUT });
+    Alert.alert(
+      'Cerrar Sesión',
+      '¿Estás seguro que deseas cerrar sesión?',
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        { 
+          text: 'Cerrar sesión', 
+          style: 'destructive',
+          onPress: () => dispatch({ type: AUTH_ACTIONS.LOGOUT })
+        },
+      ]
+    );
   };
 
   return (
@@ -39,9 +101,10 @@ export default function Perfil() {
       </View>
 
       <InfoUsuario 
-        nombre={usuario.nombre}
+        nombre={nombreCompleto}
         email={usuario.email}
         avatar={usuario.avatar}
+        onAvatarChange={handleAvatarChange}
       />
 
       <View style={styles.menuContainer}>

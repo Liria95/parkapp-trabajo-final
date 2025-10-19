@@ -58,27 +58,26 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ navigation }) => {
       try {
         const result = await AuthService.login(email, password);
 
+        console.log('🔐 Respuesta del login:', result); // ← LOG
+        console.log('🎫 Token recibido:', result.token); // ← LOG
+
         if (result.success && result.user) {
-          // Dispara el tipo de la acción para guardar al usuario en el contexto
+          // Guardar usuario con los tokens REALES del servidor
           dispatch({ 
             type: AUTH_ACTIONS.LOGIN, 
             payload: {
-              token: "TOKEN", // Placeholder hasta que AuthService devuelva tokens reales
-              refreshToken: "REFRESH_TOKEN", // Placeholder hasta que AuthService devuelva tokens reales
+              token: result.token,              // ← ✅ Token real
+              refreshToken: result.refreshToken, // ← ✅ RefreshToken real
               user: result.user,
             }
           });
 
-          // Ya no manejamos navegación manual, AuthContext decide automáticamente
           if (result.isAdmin) {
-            console.log('Login Admin exitoso:', result.user?.name);
-            // AuthContext navegará automáticamente a AdminNavigator
+            console.log('✅ Login Admin exitoso:', result.user?.name);
           } else {
-            console.log('Login Usuario exitoso:', result.user?.name);
-            // AuthContext navegará automáticamente a UserNavigator
+            console.log('✅ Login Usuario exitoso:', result.user?.name);
           }
         } else {
-          // Credenciales incorrectas
           Alert.alert(
             'Error de login', 
             result.message || 'Email o contraseña incorrectos', 
@@ -86,12 +85,13 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ navigation }) => {
           );
         }
       } catch (error) {
+        console.error('❌ Error en login:', error);
         Alert.alert('Error', 'Ocurrió un error inesperado', [{ text: 'OK' }]);
       } finally {
         setLoading(false);
       }
-    } // cierra el isValid
-  }; // cierra la función handleLogin
+    }
+  };
 
   return (
     <AuthContainer>
