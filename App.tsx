@@ -5,25 +5,25 @@ import { View, ActivityIndicator } from 'react-native';
 import styled from 'styled-components/native';
 
 // Importacion pantallas AUTH
-import LoginScreen from './screens/auth/LoginScreen';
-import RegisterScreen from './screens/auth/RegisterScreen';
+import LoginScreen from './src/screens/auth/LoginScreen';
+import RegisterScreen from './src/screens/auth/RegisterScreen';
 
 // Importacion pantallas ADMIN
-import AdminDashboard from './screens/admin/AdminDashboard';
-import AdminDrawer from './screens/admin/AdminDrawer';
-import EspaciosScreen from './screens/admin/EspaciosScreen';
-import GestionUsuariosScreen from './screens/admin/GestionUsuariosScreen';
-import InfraccionesScreen from './screens/admin/InfraccionesScreen';
-import RegistroManualScreen from './screens/admin/RegistroManualScreen';
-import AdminPanel from './screens/admin/AdminPanel';
+import AdminDashboard from './src/screens/admin/AdminDashboard';
+import AdminDrawer from './src/screens/admin/AdminDrawer';
+import EspaciosScreen from './src/screens/admin/EspaciosScreen';
+import GestionUsuariosScreen from './src/screens/admin/GestionUsuariosScreen';
+import InfraccionesScreen from './src/screens/admin/InfraccionesScreen';
+import RegistroManualScreen from './src/screens/admin/RegistroManualScreen';
+import AdminPanel from './src/screens/admin/AdminPanel';
 
 // Importacion navegación de usuario
-import NavegadorTabsUsuario from './screens/user/navegacion/NavegadorTabs';
+import NavegadorTabsUsuario from './src/screens/user/navegacion/NavegadorTabs';
 
 // Context
-import { AuthProvider, AuthContext } from './components/shared/Context/AuthContext';
-import { UsuarioProvider } from './screens/user/contexto/UsuarioContext';
-import { colors } from './constants/colors';
+import { AuthProvider, AuthContext } from './src/components/shared/Context/AuthContext';
+import { UsuarioProvider } from './src/screens/user/contexto/UsuarioContext';
+import { theme } from './src/config/theme';
 
 // Tipos de navegación
 export type AuthStackParamList = {
@@ -53,12 +53,12 @@ const LoadingContainer = styled.View`
   flex: 1;
   justify-content: center;
   align-items: center;
-  background-color: ${colors.lightGray};
+  background-color: ${theme.colors.lightGray};
 `;
 
 const LoadingScreen = () => (
   <LoadingContainer>
-    <ActivityIndicator size="large" color={colors.primary} />
+    <ActivityIndicator size="large" color={theme.colors.primary} />
   </LoadingContainer>
 );
 
@@ -117,11 +117,11 @@ const UserNavigator = () => (
 const RootNavigator = () => {
   const { state } = useContext(AuthContext);
 
-  console.log('Estado actual:', {
+  console.log('🔍 Estado actual:', {
     isLoading: state.isLoading,
     isAuthenticated: state.isAuthenticated,
-    userType: state.user?.type,
-    user: state.user?.name || 'No user'
+    isAdmin: state.user?.is_admin,
+    userName: state.user?.name || 'No user'
   });
 
   if (state.isLoading) {
@@ -129,12 +129,16 @@ const RootNavigator = () => {
   }
 
   if (!state.isAuthenticated) {
+    console.log('🔓 No autenticado - Mostrando AuthNavigator');
     return <AuthNavigator />;
   }
 
-  if (state.user?.type === 'admin') {
+  // ✅ CORREGIDO: Verificar is_admin (booleano) en lugar de type (string)
+  if (state.user?.is_admin === true) {
+    console.log('👑 Usuario Admin detectado - Mostrando AdminNavigator');
     return <AdminNavigator />;
   } else {
+    console.log('🙌 Usuario normal detectado - Mostrando UserNavigator');
     return <UserNavigator />;
   }
 };
