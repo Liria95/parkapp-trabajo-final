@@ -1,7 +1,7 @@
-import React, { useContext } from 'react';
+import React, { useContext, useEffect } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { View, ActivityIndicator } from 'react-native';
+import { ActivityIndicator } from 'react-native';
 import styled from 'styled-components/native';
 
 // Importacion pantallas AUTH
@@ -24,6 +24,11 @@ import NavegadorTabsUsuario from './src/screens/user/navegacion/NavegadorTabs';
 import { AuthProvider, AuthContext } from './src/components/shared/Context/AuthContext';
 import { UsuarioProvider } from './src/screens/user/contexto/UsuarioContext';
 import { theme } from './src/config/theme';
+
+// ========================================
+// ✅ NUEVO: Import del hook de notificaciones
+// ========================================
+import { useNotifications } from './src/hooks/useNotifications';
 
 // Tipos de navegación
 export type AuthStackParamList = {
@@ -83,7 +88,7 @@ const AuthNavigator = () => (
   </AuthStack.Navigator>
 );
 
-//Stack para Admin con TODAS las pantallas
+// Stack para Admin con TODAS las pantallas
 const AdminNavigator = () => (
   <AdminStack.Navigator 
     screenOptions={{
@@ -117,13 +122,38 @@ const UserNavigator = () => (
 const RootNavigator = () => {
   const { state } = useContext(AuthContext);
 
-  console.log('🔍 Estado actual:', {
+  // ========================================
+  // ✅ NUEVO: Inicializar notificaciones cuando el usuario esté logueado
+  // ========================================
+  const { expoPushToken } = useNotifications(
+    state.user?.id,
+    state.token || undefined
+  );
+
+  useEffect(() => {
+    if (expoPushToken && state.user) {
+      console.log('📱 Token de notificaciones registrado:', expoPushToken);
+      console.log('👤 Para usuario:', state.user.name);
+    }
+  }, [expoPushToken, state.user]);
+
+  // ========================================
+  // Debug logs
+  // ========================================
+  console.log('🔍 ===== ROOT NAVIGATOR =====');
+  console.log('📊 Estado:', {
     isLoading: state.isLoading,
     isAuthenticated: state.isAuthenticated,
     isAdmin: state.user?.isAdmin,
-    userName: state.user?.name || 'No user'
+    userName: state.user?.name || 'No user',
+    hasToken: !!state.token,
+    pushToken: expoPushToken ? 'Registrado' : 'No registrado',
   });
+  console.log('============================');
 
+  // ========================================
+  // Navegación según estado
+  // ========================================
   if (state.isLoading) {
     return <LoadingScreen />;
   }
@@ -133,7 +163,6 @@ const RootNavigator = () => {
     return <AuthNavigator />;
   }
 
-  // Verificar is_admin (booleano) en lugar de type (string)
   if (state.user?.isAdmin === true) {
     console.log('👑 Usuario Admin detectado - Mostrando AdminNavigator');
     return <AdminNavigator />;
