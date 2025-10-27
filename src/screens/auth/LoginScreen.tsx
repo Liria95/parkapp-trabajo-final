@@ -57,9 +57,18 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ navigation }) => {
     try {
       const result = await AuthService.login(email, password);
 
-      console.log('🔐 Respuesta del backend:', result);
+      console.log('===== RESPUESTA DEL BACKEND =====');
+      console.log('Result completo:', JSON.stringify(result, null, 2));
+      console.log('Success:', result.success);
+      console.log('User:', result.user);
+      console.log('isAdmin en result:', result.isAdmin);
+      console.log('isAdmin en user:', result.user?.isAdmin);
+      console.log('Token:', result.token ? 'Presente' : 'Faltante');
+      console.log('===================================');
 
       if (result.success && result.user) {
+        console.log('Ejecutando dispatch...');
+        
         // Guardar usuario y tokens en el contexto global
         dispatch({
           type: AUTH_ACTIONS.LOGIN,
@@ -70,12 +79,23 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ navigation }) => {
           },
         });
 
-        // ✅ Redirección según el tipo de usuario (CORREGIDO)
-        if (result.isAdmin) {
-          console.log('👑 Login Admin exitoso:', result.user?.name);
+        console.log('Dispatch ejecutado');
+        
+        // Debug: Ver estado después del dispatch
+        setTimeout(() => {
+          console.log('Estado después del dispatch:', {
+            user: state.user,
+            isAdmin: state.user?.isAdmin,
+            token: state.token ? 'Presente' : 'Faltante'
+          });
+        }, 500);
+
+        // Redirección según el tipo de usuario
+        if (result.user.isAdmin) {
+          console.log('Login Admin exitoso:', result.user?.name);
           // RootNavigator manejará la navegación automáticamente
         } else {
-          console.log('🙌 Login Usuario exitoso:', result.user?.name);
+          console.log('Login Usuario exitoso:', result.user?.name);
           // RootNavigator manejará la navegación automáticamente
         }
       } else {
@@ -86,7 +106,7 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ navigation }) => {
         );
       }
     } catch (error) {
-      console.error('❌ Error en login:', error);
+      console.error('Error en login:', error);
       Alert.alert('Error', 'Ocurrió un error inesperado. Intenta de nuevo.', [
         { text: 'OK' },
       ]);

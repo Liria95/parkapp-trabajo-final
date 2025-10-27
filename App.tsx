@@ -120,7 +120,7 @@ const RootNavigator = () => {
   console.log('🔍 Estado actual:', {
     isLoading: state.isLoading,
     isAuthenticated: state.isAuthenticated,
-    isAdmin: state.user?.is_admin,
+    isAdmin: state.user?.isAdmin,
     userName: state.user?.name || 'No user'
   });
 
@@ -133,8 +133,8 @@ const RootNavigator = () => {
     return <AuthNavigator />;
   }
 
-  // ✅ CORREGIDO: Verificar is_admin (booleano) en lugar de type (string)
-  if (state.user?.is_admin === true) {
+  // Verificar is_admin (booleano) en lugar de type (string)
+  if (state.user?.isAdmin === true) {
     console.log('👑 Usuario Admin detectado - Mostrando AdminNavigator');
     return <AdminNavigator />;
   } else {

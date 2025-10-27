@@ -1,7 +1,0 @@
-export enum AUTH_ACTIONS {
-    LOGIN = 'LOGIN',
-    LOGOUT = 'LOGOUT',
-    SET_USER = 'SET_USER',
-    SET_LOADING = 'SET_LOADING',
-    UPDATE_USER = 'UPDATE_USER'
-}

@@ -1,20 +1,21 @@
 // ✅ AuthService.ts
+
 // Si usas EMULADOR ANDROID:
 // const API_URL = 'http://10.0.2.2:3000/api/auth';
 
 // Si usas DISPOSITIVO FÍSICO o iOS:
-const API_URL = 'http://192.168.1.5:3000/api/auth';
+const API_URL = 'http://192.168.1.7:3000/api/auth';
 
 export interface User {
-  id: number;
+  id: string;              // ← CAMBIO: string (Firebase UID)
   name: string;
   surname: string;
   email: string;
   phone: string;
-  is_admin: boolean;
+  isAdmin: boolean;        // ← CAMBIO: isAdmin (camelCase)
   balance: number;
-  created_at?: string;
-  avatar?: string;
+  createdAt?: string;      // ← CAMBIO: createdAt (camelCase)
+  avatar?: string | null;
 }
 
 export interface LoginResult {
@@ -70,15 +71,16 @@ export class AuthService {
         };
       }
 
+      // ✅ CAMBIO: Mapear campos de Firebase (camelCase)
       const formattedUser: User = {
-        id: data.user.id,
+        id: data.user.id,                    // Firebase UID (string)
         name: data.user.name,
         surname: data.user.surname,
         email: data.user.email,
         phone: data.user.phone,
-        is_admin: data.user.is_admin,
-        balance: parseFloat(data.user.balance),
-        created_at: data.user.created_at,
+        isAdmin: data.user.isAdmin || false, // ← camelCase
+        balance: parseFloat(data.user.balance || 0),
+        createdAt: data.user.createdAt,      // ← camelCase
         avatar: data.user.avatar || null,
       };
 
@@ -87,7 +89,7 @@ export class AuthService {
         user: formattedUser,
         token: data.token,
         refreshToken: data.refreshToken || data.token,
-        isAdmin: formattedUser.is_admin,
+        isAdmin: formattedUser.isAdmin,      // ← camelCase
         message: data.message || 'Login exitoso',
       };
     } catch (error) {
