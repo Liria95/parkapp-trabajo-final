@@ -7,11 +7,15 @@ import BotonPrimSec from "../../componentes/Boton";
 import InfoEstacionamiento from "../../componentes/InfoEstacionamiento";
 import { theme } from "../../../../config/theme";
 import { UsuarioContext } from "../../contexto/UsuarioContext";
+import { AuthContext } from "../../../../components/shared/Context/AuthContext";
 import { RutasStackParamList } from "../../tipos/RutasStack";
 
 export default function RegistrarVehiculo() {
-  const context = useContext(UsuarioContext);
-  if (!context) throw new Error("UsuarioContext debe estar dentro del UsuarioProvider");
+  const usuarioContext = useContext(UsuarioContext);
+  const authContext = useContext(AuthContext);
+  
+  if (!usuarioContext) throw new Error("UsuarioContext debe estar dentro del UsuarioProvider");
+  if (!authContext) throw new Error("AuthContext debe estar dentro del AuthProvider");
 
   const {
     saldo,
@@ -19,9 +23,10 @@ export default function RegistrarVehiculo() {
     setPatente,
     iniciarEstacionamiento,
     configEstacionamiento,
-  } = context;
+  } = usuarioContext;
 
-  // Valores por defecto si están vacíos
+  const { state } = authContext;
+
   const ubicacion = configEstacionamiento?.ubicacion || "AVENIDA SAN MARTIN 583, CIUDAD DE MENDOZA";
   const tarifaHora = configEstacionamiento?.tarifaHora || 100;
   const limite = configEstacionamiento?.limite || 2;
@@ -30,9 +35,9 @@ export default function RegistrarVehiculo() {
   const [permission, requestPermission] = useCameraPermissions();
   const navigation = useNavigation<NativeStackNavigationProp<RutasStackParamList>>();
 
-  // Debug para ver qué está llegando
   useEffect(() => {
     console.log('===== REGISTRAR VEHÍCULO =====');
+    console.log('👤 User ID:', state.user?.id);
     console.log('Config Estacionamiento:', configEstacionamiento);
     console.log('Ubicación:', ubicacion);
     console.log('Tarifa:', tarifaHora);
@@ -40,7 +45,7 @@ export default function RegistrarVehiculo() {
     console.log('Saldo:', saldo);
     console.log('Patente:', patente);
     console.log('================================');
-  }, [configEstacionamiento, ubicacion, tarifaHora, limite, saldo, patente]);
+  }, [state, configEstacionamiento, ubicacion, tarifaHora, limite, saldo, patente]);
 
   const validarPatente = (texto: string) => {
     const regex = /^([A-Z]{3}\d{3}|[A-Z]{2}\d{3}[A-Z]{2})$/;
@@ -63,9 +68,7 @@ export default function RegistrarVehiculo() {
     );
   }
 
-  const handleIniciar = () => {
-
-    // Validaciones
+  const handleIniciar = async () => {
     if (!patente || patente.trim() === "") {
       Alert.alert("Error", "Por favor ingresa una patente");
       return;
@@ -81,20 +84,23 @@ export default function RegistrarVehiculo() {
       return;
     }
 
-    // Iniciar estacionamiento
-    console.log('Iniciando estacionamiento con:', {
-      patente,
-      ubicacion,
-      tarifaHora,
-      limite,
-    });
+    const userId = state.user?.id;
 
-    iniciarEstacionamiento({
-      patente: patente.toUpperCase(),
-      ubicacion,
-      tarifaHora,
-      limite,
-    });
+    if (!userId) {
+      Alert.alert("Error", "No se pudo obtener el ID del usuario");
+      console.error("❌ User ID no disponible");
+      return;
+    }
+
+    await iniciarEstacionamiento(
+      {
+        patente: patente.toUpperCase(),
+        ubicacion,
+        tarifaHora,
+        limite,
+      },
+      userId
+    );
 
     navigation.navigate("EstacionamientoActivo");
   };
@@ -104,13 +110,11 @@ export default function RegistrarVehiculo() {
       <Text style={styles.titulo}>REGISTRAR VEHÍCULO</Text>
 
       <View style={styles.contenedorCards}>
-        {/* Cámara */}
         <View style={styles.tarjetaCamara}>
           <CameraView style={styles.camera} facing="back" />
           <Text style={styles.textoCamara}>(Simulación de cámara - OCR pendiente)</Text>
         </View>
 
-        {/* Input de patente */}
         <View style={styles.inputContainer}>
           <Text style={styles.label}>Patente detectada:</Text>
           <TextInput
@@ -123,14 +127,12 @@ export default function RegistrarVehiculo() {
           />
         </View>
 
-        {/* Info del estacionamiento */}
         <InfoEstacionamiento
           ubicacion={ubicacion}
           tarifa={`$${tarifaHora} POR HORA`}
           limite={`${limite} HORAS`}
         />
 
-        {/* Botón iniciar */}
         <BotonPrimSec
           titulo="Iniciar estacionamiento"
           tipo="relleno"
@@ -140,11 +142,10 @@ export default function RegistrarVehiculo() {
         />
       </View>
 
-      {/* Modal de recarga */}
       <Modal visible={mostrarModalRecarga} transparent animationType="slide">
         <View style={styles.overlay}>
           <View style={styles.modal}>
-            <Text style={styles.modalTitulo}>💰 Saldo insuficiente</Text>
+            <Text style={styles.modalTitulo}>Saldo insuficiente</Text>
             <Text style={styles.modalTexto}>
               Tu saldo actual: ${saldo.toFixed(2)}{'\n'}
               Necesitas: ${tarifaHora} por hora{'\n\n'}

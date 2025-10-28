@@ -1,4 +1,3 @@
-// src/hooks/useNotifications.ts
 import { useEffect, useRef, useState } from 'react';
 import * as Notifications from 'expo-notifications';
 import { NotificationService } from '../services/NotificationService';
@@ -7,7 +6,7 @@ export const useNotifications = (userId?: string, authToken?: string) => {
   const [expoPushToken, setExpoPushToken] = useState<string | null>(null);
   const [notification, setNotification] = useState<Notifications.Notification | undefined>(undefined);
   
-  // ✅ CORRECCIÓN: Inicializar refs con undefined
+  // Inicializar refs con undefined
   const notificationListener = useRef<Notifications.Subscription | undefined>(undefined);
   const responseListener = useRef<Notifications.Subscription | undefined>(undefined);
 
@@ -30,13 +29,13 @@ export const useNotifications = (userId?: string, authToken?: string) => {
 
     // Listener para cuando llega una notificación (app en primer plano)
     notificationListener.current = Notifications.addNotificationReceivedListener(notification => {
-      console.log('🔔 Notificación recibida:', notification);
+      console.log('Notificación recibida:', notification);
       setNotification(notification);
     });
 
     // Listener para cuando el usuario toca la notificación
     responseListener.current = Notifications.addNotificationResponseReceivedListener(response => {
-      console.log('👆 Usuario tocó la notificación:', response);
+      console.log('Usuario tocó la notificación:', response);
       
       const data = response.notification.request.content.data;
       

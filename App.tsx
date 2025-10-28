@@ -25,10 +25,9 @@ import { AuthProvider, AuthContext } from './src/components/shared/Context/AuthC
 import { UsuarioProvider } from './src/screens/user/contexto/UsuarioContext';
 import { theme } from './src/config/theme';
 
-// ========================================
-// ✅ NUEVO: Import del hook de notificaciones
-// ========================================
+// Hooks de notificaciones
 import { useNotifications } from './src/hooks/useNotifications';
+import { useNotificationListener } from './src/services/NotificationListener'; // ✅ NUEVO
 
 // Tipos de navegación
 export type AuthStackParamList = {
@@ -122,26 +121,25 @@ const UserNavigator = () => (
 const RootNavigator = () => {
   const { state } = useContext(AuthContext);
 
-  // ========================================
-  // ✅ NUEVO: Inicializar notificaciones cuando el usuario esté logueado
-  // ========================================
+  // Inicializar notificaciones cuando el usuario esté logueado
   const { expoPushToken } = useNotifications(
     state.user?.id,
     state.token || undefined
   );
 
+  // Listener de notificaciones programadas
+  useNotificationListener({ userId: state.user?.id });
+
   useEffect(() => {
     if (expoPushToken && state.user) {
-      console.log('📱 Token de notificaciones registrado:', expoPushToken);
-      console.log('👤 Para usuario:', state.user.name);
+      console.log('Token de notificaciones registrado:', expoPushToken);
+      console.log('Para usuario:', state.user.name);
     }
   }, [expoPushToken, state.user]);
 
-  // ========================================
   // Debug logs
-  // ========================================
-  console.log('🔍 ===== ROOT NAVIGATOR =====');
-  console.log('📊 Estado:', {
+  console.log('===== ROOT NAVIGATOR =====');
+  console.log('Estado:', {
     isLoading: state.isLoading,
     isAuthenticated: state.isAuthenticated,
     isAdmin: state.user?.isAdmin,
@@ -151,23 +149,21 @@ const RootNavigator = () => {
   });
   console.log('============================');
 
-  // ========================================
   // Navegación según estado
-  // ========================================
   if (state.isLoading) {
     return <LoadingScreen />;
   }
 
   if (!state.isAuthenticated) {
-    console.log('🔓 No autenticado - Mostrando AuthNavigator');
+    console.log('No autenticado - Mostrando AuthNavigator');
     return <AuthNavigator />;
   }
 
   if (state.user?.isAdmin === true) {
-    console.log('👑 Usuario Admin detectado - Mostrando AdminNavigator');
+    console.log('Usuario Admin detectado - Mostrando AdminNavigator');
     return <AdminNavigator />;
   } else {
-    console.log('🙌 Usuario normal detectado - Mostrando UserNavigator');
+    console.log('Usuario normal detectado - Mostrando UserNavigator');
     return <UserNavigator />;
   }
 };

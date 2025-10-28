@@ -1,10 +1,9 @@
-// src/hooks/useParkingNotifications.ts
 import { useEffect, useRef } from 'react';
 import { NotificationService } from '../services/NotificationService';
 
 interface ParkingData {
   inicio: Date;
-  limite: number; // horas
+  limite: number;
   patente: string;
   ubicacion: string;
   tarifaHora: number;
@@ -12,13 +11,13 @@ interface ParkingData {
 
 export const useParkingNotifications = (
   estacionamiento: ParkingData | null,
-  activo: boolean
+  activo: boolean,
+  userId: string | undefined
 ) => {
   const notificationIds = useRef<string[]>([]);
 
   useEffect(() => {
-    if (!activo || !estacionamiento) {
-      // Cancelar todas las notificaciones si no hay estacionamiento activo
+    if (!activo || !estacionamiento || !userId) {
       NotificationService.cancelAllNotifications();
       notificationIds.current = [];
       return;
@@ -34,13 +33,7 @@ export const useParkingNotifications = (
         hour12: false,
       });
 
-      // 1. Notificación de inicio
-      await NotificationService.notifyParkingStarted(
-        estacionamiento.ubicacion,
-        estacionamiento.patente,
-        estacionamiento.limite,
-        horaVencimiento
-      );
+      // 1. Notificación de inicio ya se envió en UsuarioContext
 
       // 2. Programar avisos de vencimiento
       const tiempoTranscurridoSegundos = Math.floor(
@@ -53,10 +46,12 @@ export const useParkingNotifications = (
       const aviso15min = tiempoRestanteSegundos - (15 * 60);
       if (aviso15min > 0) {
         const id = await NotificationService.scheduleParkingExpirationWarning(
+          userId,
           aviso15min,
           estacionamiento.ubicacion,
           estacionamiento.patente,
-          15
+          15,
+          null
         );
         notificationIds.current.push(id);
       }
@@ -65,10 +60,12 @@ export const useParkingNotifications = (
       const aviso5min = tiempoRestanteSegundos - (5 * 60);
       if (aviso5min > 0) {
         const id = await NotificationService.scheduleParkingExpirationWarning(
+          userId,
           aviso5min,
           estacionamiento.ubicacion,
           estacionamiento.patente,
-          5
+          5,
+          null
         );
         notificationIds.current.push(id);
       }
@@ -77,43 +74,48 @@ export const useParkingNotifications = (
       const aviso1min = tiempoRestanteSegundos - 60;
       if (aviso1min > 0) {
         const id = await NotificationService.scheduleParkingExpirationWarning(
+          userId,
           aviso1min,
           estacionamiento.ubicacion,
           estacionamiento.patente,
-          1
+          1,
+          null
         );
         notificationIds.current.push(id);
       }
 
-      console.log(`🔔 ${notificationIds.current.length} notificaciones programadas`);
+      console.log(`${notificationIds.current.length} notificaciones programadas`);
     };
 
     setupNotifications();
 
-    // Cleanup: cancelar notificaciones cuando el componente se desmonte
     return () => {
       notificationIds.current.forEach(id => {
         NotificationService.cancelNotification(id);
       });
       notificationIds.current = [];
     };
-  }, [estacionamiento, activo]);
+  }, [estacionamiento, activo, userId]);
 
   return {
-    // Función para notificar extensión
     notifyExtension: async (horasExtendidas: number, nuevaHoraVencimiento: string) => {
+      if (!userId) return;
       await NotificationService.notifyParkingExtended(
+        userId,
         horasExtendidas,
-        nuevaHoraVencimiento
+        nuevaHoraVencimiento,
+        null
       );
     },
 
-    // Función para notificar finalización
     notifyEnd: async (duracion: string, costo: number) => {
+      if (!userId || !estacionamiento) return;
       await NotificationService.notifyParkingEnded(
-        estacionamiento?.ubicacion || '',
+        userId,
+        estacionamiento.ubicacion,
         costo,
-        duracion
+        duracion,
+        null
       );
     },
   };

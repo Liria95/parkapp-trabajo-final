@@ -1,6 +1,4 @@
-// ============================================
 // COLORES
-// ============================================
 
 const colors = {
   // ========== COLORES PRINCIPALES ==========
@@ -49,18 +47,13 @@ const colors = {
   shadow: 'rgba(0, 0, 0, 0.15)',      // Color de sombras
 };
 
-// ============================================
 // TIPOGRAFÍA
-// ============================================
 
 const typography = {
   // ========== FAMILIAS DE FUENTES ==========
   fontFamily: {
     regular: 'System',           // Fuente por defecto
     bold: 'System',              // Fuente bold
-    // Si quieres usar custom fonts:
-    // regular: 'Roboto-Regular',
-    // bold: 'Roboto-Bold',
   },
   
   // ========== TAMAÑOS DE FUENTE ==========
@@ -141,9 +134,7 @@ const typography = {
   },
 };
 
-// ============================================
 // ESPACIADOS
-// ============================================
 
 const spacing = {
   xs: 4,      // 4px
@@ -155,9 +146,7 @@ const spacing = {
   xxxl: 64,   // 64px
 };
 
-// ============================================
 // BORDES
-// ============================================
 
 const borderRadius = {
   none: 0,
@@ -174,9 +163,7 @@ const borderWidth = {
   thick: 3,
 };
 
-// ============================================
 // SOMBRAS
-// ============================================
 
 const shadows = {
   // Sombra ligera (elevación 1)
@@ -216,9 +203,7 @@ const shadows = {
   },
 };
 
-// ============================================
 // TAMAÑOS DE ICONOS
-// ============================================
 
 const iconSizes = {
   xs: 16,
@@ -229,9 +214,7 @@ const iconSizes = {
   xxl: 64,
 };
 
-// ============================================
 // TAMAÑOS DE BOTONES
-// ============================================
 
 const buttonSizes = {
   sm: {
@@ -251,9 +234,7 @@ const buttonSizes = {
   },
 };
 
-// ============================================
 // TAMAÑOS DE INPUT
-// ============================================
 
 const inputSizes = {
   sm: {
@@ -273,9 +254,7 @@ const inputSizes = {
   },
 };
 
-// ============================================
 // CONFIGURACIÓN DE LAYOUT
-// ============================================
 
 const layout = {
   // Ancho máximo del contenedor
@@ -299,9 +278,7 @@ const layout = {
   tabBarHeight: 60,
 };
 
-// ============================================
 // ANIMACIONES
-// ============================================
 
 const animation = {
   // Duraciones
@@ -319,9 +296,7 @@ const animation = {
   },
 };
 
-// ============================================
 // OPACIDADES
-// ============================================
 
 const opacity = {
   disabled: 0.5,
@@ -330,9 +305,7 @@ const opacity = {
   overlay: 0.5,
 };
 
-// ============================================
 // EXPORTAR TODO COMO THEME
-// ============================================
 
 export const theme = {
   colors,
@@ -349,18 +322,14 @@ export const theme = {
   opacity,
 } as const;
 
-// ============================================
 // TIPOS DE TYPESCRIPT
-// ============================================
 
 export type Theme = typeof theme;
 export type ThemeColors = typeof colors;
 export type ThemeSpacing = typeof spacing;
 export type ThemeShadows = typeof shadows;
 
-// ============================================
 // HELPER PARA OBTENER COLORES DE ESTADO
-// ============================================
 
 /**
  * Obtiene el color de fondo según el estado del espacio
@@ -389,46 +358,7 @@ export const getTransaccionColor = (estado: 'pagada' | 'pendiente' | 'cancelada'
   return theme.colors.transaccion[estado] || theme.colors.lightGray;
 };
 
-// ============================================
-// EJEMPLO DE USO
-// ============================================
-
-/*
-import { theme } from '@config/theme';
-
-// En componentes
-<View style={{
-  backgroundColor: theme.colors.primary,
-  padding: theme.spacing.md,
-  borderRadius: theme.borderRadius.lg,
-  ...theme.shadows.md,
-}}>
-  <Text style={theme.typography.h1}>Título</Text>
-  <Text style={theme.typography.body}>Contenido</Text>
-</View>
-
-// Con styled-components
-const Container = styled.View`
-  background-color: ${theme.colors.primary};
-  padding: ${theme.spacing.md}px;
-  border-radius: ${theme.borderRadius.lg}px;
-`;
-
-// Usando helpers
-<View style={{
-  backgroundColor: getEstadoColor('libre'),
-}}>
-  <Text style={{
-    color: getEstadoTextColor('libre'),
-  }}>
-    Disponible
-  </Text>
-</View>
-*/
-
-// ============================================
-// MODO OSCURO (OPCIONAL - PARA FUTURO)
-// ============================================
+// MODO OSCURO
 
 export const darkTheme = {
   ...theme,
@@ -439,6 +369,5 @@ export const darkTheme = {
     white: '#1A1A1A',
     lightGray: '#2C2C2C',
     gray: '#B0B0B0',
-    // ... resto de colores adaptados
   },
 };
