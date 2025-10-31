@@ -1,20 +1,15 @@
-// ✅ AuthService.ts
-
-// Si usas EMULADOR ANDROID:
-// const API_URL = 'http://10.0.2.2:3000/api/auth';
-
-// Si usas DISPOSITIVO FÍSICO o iOS:
-const API_URL = 'http://192.168.1.7:3000/api/auth';
+// DISPOSITIVO FÍSICO o iOS:
+const API_URL = 'http://192.168.1.5:3000/api/auth';
 
 export interface User {
-  id: string;              // ← CAMBIO: string (Firebase UID)
+  id: string;
   name: string;
   surname: string;
   email: string;
   phone: string;
-  isAdmin: boolean;        // ← CAMBIO: isAdmin (camelCase)
+  isAdmin: boolean;
   balance: number;
-  createdAt?: string;      // ← CAMBIO: createdAt (camelCase)
+  createdAt?: string;
   avatar?: string | null;
 }
 
@@ -36,11 +31,11 @@ export interface RegisterData {
 }
 
 export class AuthService {
-  // 🔹 LOGIN
+  // LOGIN
   static async login(email: string, password: string): Promise<LoginResult> {
     try {
-      console.log('🔵 Intentando login a:', `${API_URL}/login`);
-      console.log('📩 Email:', email);
+      console.log('Intentando login a:', `${API_URL}/login`);
+      console.log('Email:', email);
 
       const response = await fetch(`${API_URL}/login`, {
         method: 'POST',
@@ -48,10 +43,10 @@ export class AuthService {
         body: JSON.stringify({ email, password }),
       });
 
-      console.log('🔵 Response status:', response.status);
+      console.log('Response status:', response.status);
 
       const data = await response.json();
-      console.log('🔵 Response data:', data);
+      console.log('Response data:', data);
 
       // Manejo de error del backend
       if (!response.ok || !data.success) {
@@ -71,16 +66,16 @@ export class AuthService {
         };
       }
 
-      // ✅ CAMBIO: Mapear campos de Firebase (camelCase)
+      // Mapear campos de Firebase
       const formattedUser: User = {
-        id: data.user.id,                    // Firebase UID (string)
+        id: data.user.id,
         name: data.user.name,
         surname: data.user.surname,
         email: data.user.email,
         phone: data.user.phone,
-        isAdmin: data.user.isAdmin || false, // ← camelCase
+        isAdmin: data.user.isAdmin || false,
         balance: parseFloat(data.user.balance || 0),
-        createdAt: data.user.createdAt,      // ← camelCase
+        createdAt: data.user.createdAt,
         avatar: data.user.avatar || null,
       };
 
@@ -89,11 +84,11 @@ export class AuthService {
         user: formattedUser,
         token: data.token,
         refreshToken: data.refreshToken || data.token,
-        isAdmin: formattedUser.isAdmin,      // ← camelCase
+        isAdmin: formattedUser.isAdmin,
         message: data.message || 'Login exitoso',
       };
     } catch (error) {
-      console.error('❌ Error conectando al servidor:', error);
+      console.error('Error conectando al servidor:', error);
       return {
         success: false,
         message: 'No se pudo conectar al servidor. Verifica tu conexión.',
@@ -102,11 +97,11 @@ export class AuthService {
     }
   }
 
-  // 🔹 REGISTER
+  // REGISTER
   static async register(data: RegisterData): Promise<LoginResult> {
     try {
-      console.log('🔵 Intentando registro a:', `${API_URL}/register`);
-      console.log('📦 Datos enviados:', data);
+      console.log('Intentando registro a:', `${API_URL}/register`);
+      console.log('Datos enviados:', data);
 
       const response = await fetch(`${API_URL}/register`, {
         method: 'POST',
@@ -114,10 +109,10 @@ export class AuthService {
         body: JSON.stringify(data),
       });
 
-      console.log('🔵 Response status:', response.status);
+      console.log('Response status:', response.status);
 
       const result = await response.json();
-      console.log('🔵 Response data:', result);
+      console.log('Response data:', result);
 
       if (!response.ok || !result.success) {
         return {
@@ -133,7 +128,7 @@ export class AuthService {
         isAdmin: false,
       };
     } catch (error) {
-      console.error('❌ Error conectando al servidor:', error);
+      console.error('Error conectando al servidor:', error);
       return {
         success: false,
         message: 'No se pudo conectar al servidor. Verifica tu conexión.',

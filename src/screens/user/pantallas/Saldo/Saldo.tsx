@@ -1,18 +1,13 @@
 import React, { useContext, useState } from "react";
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Modal, TextInput } from "react-native";
-import { useNavigation } from "@react-navigation/native";
-import { NativeStackNavigationProp } from "@react-navigation/native-stack";
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Modal, Alert } from "react-native";
 import TarjetaGradiente from "../../componentes/TarjetaGradiente";
 import BotonPrimSec from "../../componentes/Boton";
 import { theme } from "../../../../config/theme";
 import { UsuarioContext } from "../../contexto/UsuarioContext";
 import { AuthContext } from "../../../../components/shared/Context/AuthContext";
 import { NotificationService } from "../../../../services/NotificationService";
+import { PaymentService } from "../../../../services/PaymentService";
 import Ionicons from "@expo/vector-icons/Ionicons";
-
-type RutasStackParamList = {
-  Tabs: undefined;
-};
 
 export default function Saldo() {
   const usuarioContext = useContext(UsuarioContext);
@@ -24,40 +19,65 @@ export default function Saldo() {
   const { saldo, setSaldo, movimientos, agregarMovimiento } = usuarioContext;
   const { state } = authContext;
   const userId = state.user?.id;
+  const userName = state.user?.name;
 
   const [mostrarModalRecarga, setMostrarModalRecarga] = useState(false);
-  const [montoRecarga, setMontoRecarga] = useState("");
+  const [procesandoPago, setProcesandoPago] = useState(false);
 
-  const navigation = useNavigation<NativeStackNavigationProp<RutasStackParamList>>();
-
-  // Obtener último movimiento
   const ultimoMovimiento = movimientos.length > 0 
     ? movimientos[movimientos.length - 1] 
     : null;
 
-  // Montos predefinidos para recarga rápida
   const montosRapidos = [100, 500, 1000, 2000];
 
+  // RECARGA SIMULADA CON GUARDADO EN FIREBASE
   const handleRecarga = async (monto: number) => {
-    const nuevoSaldo = saldo + monto;
-    
-    // Actualizar saldo
-    setSaldo(nuevoSaldo);
-    
-    // Agregar movimiento
-    agregarMovimiento({ tipo: "Recarga", monto });
-
-    // Enviar notificación
-    if (userId) {
-      await NotificationService.notifyBalanceRecharged(
-        userId,
-        monto,
-        nuevoSaldo
-      );
+    if (!userId || !userName || !state.token) {
+      Alert.alert('Error', 'No se pudo obtener información del usuario');
+      return;
     }
 
-    setMostrarModalRecarga(false);
-    setMontoRecarga("");
+    const token = state.token;
+    const user = userId;
+    const name = userName;
+
+    try {
+      setProcesandoPago(true);
+      console.log('🧪 Procesando pago simulado...');
+
+      // Llamar al backend para simular el pago
+      const result = await PaymentService.simulatePayment(
+        monto,
+        user,
+        name,
+        token
+      );
+
+      if (result.success) {
+        // Actualizar saldo localmente
+        const nuevoSaldo = saldo + monto;
+        setSaldo(nuevoSaldo);
+        agregarMovimiento({ tipo: "Recarga", monto });
+
+        // Notificación
+        await NotificationService.notifyBalanceRecharged(user, monto, nuevoSaldo);
+
+        setMostrarModalRecarga(false);
+
+        Alert.alert(
+          '¡Recarga exitosa!',
+          `Se agregaron $${monto} a tu cuenta.\n\nNuevo saldo: $${nuevoSaldo.toFixed(2)}`,
+          [{ text: 'OK' }]
+        );
+      } else {
+        Alert.alert('Error', 'No se pudo procesar el pago');
+      }
+    } catch (error) {
+      console.error('Error:', error);
+      Alert.alert('Error', 'Ocurrió un error al procesar el pago');
+    } finally {
+      setProcesandoPago(false);
+    }
   };
 
   const formatearFecha = (index: number) => {
@@ -79,7 +99,7 @@ export default function Saldo() {
         style={styles.scrollContainer}
         showsVerticalScrollIndicator={false}
       >
-        {/* Tarjeta de saldo actual con gradiente */}
+        {/* Tarjeta de saldo actual */}
         <TarjetaGradiente 
           style={styles.tarjetaSaldo}
           colores={[theme.colors.secondary, theme.colors.success]}
@@ -189,46 +209,42 @@ export default function Saldo() {
               {montosRapidos.map((monto) => (
                 <TouchableOpacity
                   key={monto}
-                  style={styles.botonMonto}
+                  style={[
+                    styles.botonMonto,
+                    procesandoPago && styles.botonMontoDisabled
+                  ]}
                   onPress={() => handleRecarga(monto)}
+                  disabled={procesandoPago}
                 >
                   <Text style={styles.textoMonto}>${monto}</Text>
                 </TouchableOpacity>
               ))}
             </View>
 
-            <Text style={styles.modalSubtitulo}>O ingresa un monto:</Text>
-            <View style={styles.inputContainer}>
-              <Text style={styles.signo}>$</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="0"
-                value={montoRecarga}
-                onChangeText={setMontoRecarga}
-                keyboardType="numeric"
-              />
+            <View style={styles.infoPago}>
+              <Ionicons name="shield-checkmark" size={20} color={theme.colors.success} />
+              <Text style={styles.textoInfoPago}>
+                Pago procesado de forma segura
+              </Text>
             </View>
 
-            <BotonPrimSec
-              titulo="Confirmar Recarga"
-              tipo="relleno"
-              color={theme.colors.success}
-              onPress={() => {
-                const monto = parseFloat(montoRecarga);
-                if (!isNaN(monto) && monto > 0) {
-                  handleRecarga(monto);
-                }
-              }}
-            />
+            {procesandoPago && (
+              <View style={styles.containerProcesando}>
+                <Text style={styles.textoProcesando}>
+                  Procesando pago...
+                </Text>
+              </View>
+            )}
 
             <BotonPrimSec
               titulo="Cancelar"
               tipo="relleno"
               color={theme.colors.gray}
-              estilo={{ marginTop: 10 }}
+              estilo={{ marginTop: 15 }}
               onPress={() => {
-                setMostrarModalRecarga(false);
-                setMontoRecarga("");
+                if (!procesandoPago) {
+                  setMostrarModalRecarga(false);
+                }
               }}
             />
           </View>
@@ -254,7 +270,6 @@ const styles = StyleSheet.create({
     marginBottom: 20,
     textAlign: "center",
   },
-  //TARJETA CON GRADIENTE
   tarjetaSaldo: {
     padding: 30,
     borderRadius: 20,
@@ -279,7 +294,6 @@ const styles = StyleSheet.create({
     color: theme.colors.white,
     opacity: 0.8,
   },
-  //BOTONES
   botones: {
     flexDirection: "row",
     justifyContent: "space-around",
@@ -381,7 +395,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     flexWrap: "wrap",
     gap: 10,
-    marginBottom: 10,
+    marginBottom: 15,
   },
   botonMonto: {
     flex: 1,
@@ -391,30 +405,40 @@ const styles = StyleSheet.create({
     borderRadius: 15,
     alignItems: "center",
   },
+  botonMontoDisabled: {
+    backgroundColor: '#cccccc',
+    opacity: 0.6,
+  },
   textoMonto: {
     fontSize: 18,
     fontWeight: "bold",
     color: theme.colors.white,
   },
-  inputContainer: {
+  infoPago: {
     flexDirection: "row",
     alignItems: "center",
-    borderWidth: 2,
-    borderColor: theme.colors.gray,
-    borderRadius: 12,
-    paddingHorizontal: 15,
-    marginBottom: 20,
+    justifyContent: "center",
+    marginVertical: 10,
+    padding: 10,
+    backgroundColor: theme.colors.lightGray,
+    borderRadius: 10,
   },
-  signo: {
-    fontSize: 20,
-    fontWeight: "bold",
-    color: theme.colors.dark,
-    marginRight: 5,
+  textoInfoPago: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: theme.colors.success,
+    marginLeft: 8,
   },
-  input: {
-    flex: 1,
-    fontSize: 18,
+  containerProcesando: {
+    backgroundColor: theme.colors.lightGray,
     padding: 15,
-    color: theme.colors.dark,
+    borderRadius: 10,
+    marginVertical: 10,
+  },
+  textoProcesando: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: theme.colors.primary,
+    textAlign: "center",
   },
 });
