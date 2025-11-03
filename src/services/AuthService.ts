@@ -1,5 +1,6 @@
-// DISPOSITIVO FÍSICO o iOS:
-const API_URL = 'http://192.168.1.5:3000/api/auth';
+import { API_URLS } from '../config/api.config';
+
+const API_URL = API_URLS.AUTH;
 
 export interface User {
   id: string;

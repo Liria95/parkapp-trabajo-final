@@ -4,6 +4,7 @@ import { Platform } from 'react-native';
 import Constants from 'expo-constants';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../config/firebase';
+import { API_URLS } from '../config/api.config';
 
 // Configurar cómo se manejan las notificaciones
 Notifications.setNotificationHandler({
@@ -153,7 +154,7 @@ export class NotificationService {
       console.log('UserId:', userId);
       console.log('Token:', token.substring(0, 30) + '...');
       
-      const response = await fetch('http://192.168.1.7:3000/api/notifications/register', {
+      const response = await fetch(`${API_URLS.NOTIFICATIONS}/register`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

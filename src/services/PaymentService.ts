@@ -1,65 +1,18 @@
-import { Alert, Linking } from 'react-native';
+import { Alert } from 'react-native';
+import { API_URLS } from '../config/api.config';
 
-const API_URL = 'http://192.168.1.5:3000/api/payments'; // IP
-
-interface CreatePaymentResult {
-  success: boolean;
-  init_point?: string;
-}
+const API_URL = API_URLS.PAYMENTS;
 
 interface SimulatePaymentResult {
   success: boolean;
   payment?: any;
+  message?: string;
 }
 
 export class PaymentService {
   
   /**
-   * Crear un pago con Mercado Pago
-   */
-  static async createPayment(
-    amount: number,
-    userId: string,
-    userName: string,
-    authToken: string
-  ): Promise<CreatePaymentResult> {
-    try {
-      console.log('Creando pago de Mercado Pago...');
-      console.log('  - Monto:', amount);
-      console.log('  - Usuario:', userName);
-
-      const response = await fetch(`${API_URL}/create-payment`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${authToken}`
-        },
-        body: JSON.stringify({
-          amount,
-          userId,
-          userName,
-          description: `Recarga de saldo ParkApp - $${amount}`
-        })
-      });
-
-      const data = await response.json();
-
-      if (data.success) {
-        console.log('Link de pago generado');
-        return { success: true, init_point: data.init_point };
-      } else {
-        console.error('Error:', data.message);
-        return { success: false };
-      }
-
-    } catch (error) {
-      console.error('Error al crear pago:', error);
-      return { success: false };
-    }
-  }
-
-  /**
-   * Simular un pago (sin Mercado Pago)
+   * Simular pago
    */
   static async simulatePayment(
     amount: number,
@@ -71,6 +24,14 @@ export class PaymentService {
       console.log('Simulando pago...');
       console.log('  - Monto:', amount);
       console.log('  - Usuario:', userName);
+      console.log('  - Token:', authToken ? authToken.substring(0, 30) + '...' : 'NO HAY TOKEN');
+
+      if (!authToken) {
+        return {
+          success: false,
+          message: 'Token no disponible'
+        };
+      }
 
       const response = await fetch(`${API_URL}/simulate-payment`, {
         method: 'POST',
@@ -85,41 +46,51 @@ export class PaymentService {
         })
       });
 
+      console.log('Status:', response.status);
+
       const data = await response.json();
 
-      if (data.success) {
+      if (response.ok && data.success) {
         console.log('Pago simulado exitoso');
-        return { success: true, payment: data.payment };
+        return { 
+          success: true, 
+          payment: data.payment, 
+          message: data.message 
+        };
       } else {
         console.error('Error:', data.message);
-        return { success: false };
+        return { 
+          success: false, 
+          message: data.message 
+        };
       }
 
-    } catch (error) {
-      console.error('Error al simular pago:', error);
-      return { success: false };
+    } catch (error: any) {
+      console.error('Error:', error);
+      return { 
+        success: false, 
+        message: 'Error de conexión' 
+      };
     }
   }
 
   /**
-   * Abrir checkout de Mercado Pago
+   * Verificar estado del servicio
    */
-  static async openCheckout(paymentUrl: string): Promise<void> {
+  static async checkStatus(): Promise<{ success: boolean; message?: string }> {
     try {
-      console.log('Abriendo checkout de Mercado Pago...');
+      const response = await fetch(`${API_URL}/test`);
+      const data = await response.json();
       
-      const canOpen = await Linking.canOpenURL(paymentUrl);
-      
-      if (canOpen) {
-        await Linking.openURL(paymentUrl);
-        console.log('Navegador abierto');
-      } else {
-        throw new Error('No se puede abrir el navegador');
-      }
-      
+      return {
+        success: data.success,
+        message: data.message
+      };
     } catch (error) {
-      console.error('Error al abrir checkout:', error);
-      Alert.alert('Error', 'No se pudo abrir Mercado Pago');
+      return {
+        success: false,
+        message: 'No se pudo conectar con el servidor'
+      };
     }
   }
 }

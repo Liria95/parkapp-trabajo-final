@@ -18,8 +18,6 @@ export default function Saldo() {
 
   const { saldo, setSaldo, movimientos, agregarMovimiento } = usuarioContext;
   const { state } = authContext;
-  const userId = state.user?.id;
-  const userName = state.user?.name;
 
   const [mostrarModalRecarga, setMostrarModalRecarga] = useState(false);
   const [procesandoPago, setProcesandoPago] = useState(false);
@@ -30,51 +28,51 @@ export default function Saldo() {
 
   const montosRapidos = [100, 500, 1000, 2000];
 
-  // RECARGA SIMULADA CON GUARDADO EN FIREBASE
   const handleRecarga = async (monto: number) => {
-    if (!userId || !userName || !state.token) {
-      Alert.alert('Error', 'No se pudo obtener información del usuario');
+    const userId = state.user?.id;
+    const userName = state.user?.name;
+    const token = state.token;
+    
+    console.log('Verificando autenticación:');
+    console.log('  - userId:', userId);
+    console.log('  - userName:', userName);
+    console.log('  - token:', token ? 'Presente' : 'FALTANTE');
+    
+    if (!userId || !userName || !token) {
+      Alert.alert('Error', 'Sesión no válida. Inicia sesión nuevamente.');
       return;
     }
 
-    const token = state.token;
-    const user = userId;
-    const name = userName;
-
     try {
       setProcesandoPago(true);
-      console.log('🧪 Procesando pago simulado...');
+      console.log('Procesando pago simulado...');
 
-      // Llamar al backend para simular el pago
       const result = await PaymentService.simulatePayment(
         monto,
-        user,
-        name,
+        userId,
+        userName,
         token
       );
 
       if (result.success) {
-        // Actualizar saldo localmente
         const nuevoSaldo = saldo + monto;
         setSaldo(nuevoSaldo);
         agregarMovimiento({ tipo: "Recarga", monto });
 
-        // Notificación
-        await NotificationService.notifyBalanceRecharged(user, monto, nuevoSaldo);
+        await NotificationService.notifyBalanceRecharged(userId, monto, nuevoSaldo);
 
         setMostrarModalRecarga(false);
 
         Alert.alert(
-          '¡Recarga exitosa!',
-          `Se agregaron $${monto} a tu cuenta.\n\nNuevo saldo: $${nuevoSaldo.toFixed(2)}`,
-          [{ text: 'OK' }]
+          'Recarga exitosa',
+          `Se agregaron $${monto} a tu cuenta.\n\nNuevo saldo: $${nuevoSaldo.toFixed(2)}`
         );
       } else {
-        Alert.alert('Error', 'No se pudo procesar el pago');
+        Alert.alert('Error', result.message || 'No se pudo procesar');
       }
     } catch (error) {
       console.error('Error:', error);
-      Alert.alert('Error', 'Ocurrió un error al procesar el pago');
+      Alert.alert('Error', 'Ocurrió un error');
     } finally {
       setProcesandoPago(false);
     }
