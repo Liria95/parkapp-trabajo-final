@@ -1,4 +1,4 @@
-import React, { useContext, useState } from "react";
+import React, { useContext, useState, useEffect } from "react";
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Modal, Alert } from "react-native";
 import TarjetaGradiente from "../../componentes/TarjetaGradiente";
 import BotonPrimSec from "../../componentes/Boton";
@@ -7,6 +7,7 @@ import { UsuarioContext } from "../../contexto/UsuarioContext";
 import { AuthContext } from "../../../../components/shared/Context/AuthContext";
 import { NotificationService } from "../../../../services/NotificationService";
 import { PaymentService } from "../../../../services/PaymentService";
+import { BalanceService } from "../../../../services/BalanceService";
 import Ionicons from "@expo/vector-icons/Ionicons";
 
 export default function Saldo() {
@@ -21,12 +22,44 @@ export default function Saldo() {
 
   const [mostrarModalRecarga, setMostrarModalRecarga] = useState(false);
   const [procesandoPago, setProcesandoPago] = useState(false);
+  const [cargandoSaldo, setCargandoSaldo] = useState(true);
 
   const ultimoMovimiento = movimientos.length > 0 
     ? movimientos[movimientos.length - 1] 
     : null;
 
   const montosRapidos = [100, 500, 1000, 2000];
+
+  // Cargar saldo desde Firebase al montar el componente
+  useEffect(() => {
+    cargarSaldoDesdeServidor();
+  }, []);
+
+  const cargarSaldoDesdeServidor = async () => {
+    const token = state.token;
+    
+    if (!token) {
+      console.log('No hay token disponible');
+      setCargandoSaldo(false);
+      return;
+    }
+
+    try {
+      console.log('Cargando saldo desde Firebase...');
+      const result = await BalanceService.getBalance(token);
+      
+      if (result.success && result.balance !== undefined) {
+        console.log('Saldo cargado desde Firebase:', result.balance);
+        setSaldo(result.balance);
+      } else {
+        console.error('Error al cargar saldo:', result.message);
+      }
+    } catch (error) {
+      console.error('Error al cargar saldo:', error);
+    } finally {
+      setCargandoSaldo(false);
+    }
+  };
 
   const handleRecarga = async (monto: number) => {
     const userId = state.user?.id;
@@ -55,17 +88,18 @@ export default function Saldo() {
       );
 
       if (result.success) {
-        const nuevoSaldo = saldo + monto;
-        setSaldo(nuevoSaldo);
+        // Recargar saldo desde el servidor para asegurar sincronización
+        await cargarSaldoDesdeServidor();
+        
         agregarMovimiento({ tipo: "Recarga", monto });
 
-        await NotificationService.notifyBalanceRecharged(userId, monto, nuevoSaldo);
+        await NotificationService.notifyBalanceRecharged(userId, monto, saldo + monto);
 
         setMostrarModalRecarga(false);
 
         Alert.alert(
           'Recarga exitosa',
-          `Se agregaron $${monto} a tu cuenta.\n\nNuevo saldo: $${nuevoSaldo.toFixed(2)}`
+          `Se agregaron $${monto} a tu cuenta.\n\nNuevo saldo: $${(saldo + monto).toFixed(2)}`
         );
       } else {
         Alert.alert('Error', result.message || 'No se pudo procesar');
@@ -103,7 +137,11 @@ export default function Saldo() {
           colores={[theme.colors.secondary, theme.colors.success]}
         >
           <Text style={styles.tituloSaldo}>SALDO ACTUAL</Text>
-          <Text style={styles.montoSaldo}>${saldo.toFixed(2)}</Text>
+          {cargandoSaldo ? (
+            <Text style={styles.montoSaldo}>Cargando...</Text>
+          ) : (
+            <Text style={styles.montoSaldo}>${saldo.toFixed(2)}</Text>
+          )}
           
           {ultimoMovimiento && (
             <Text style={styles.ultimoMovimiento}>

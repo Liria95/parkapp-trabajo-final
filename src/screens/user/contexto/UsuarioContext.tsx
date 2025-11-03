@@ -38,6 +38,7 @@ type UsuarioContextType = {
     limite: number;
   }>>;
   actualizarSaldoEstacionamiento: () => void;
+  limpiarDatos: () => void;
 };
 
 export const UsuarioContext = createContext<UsuarioContextType | undefined>(undefined);
@@ -47,7 +48,8 @@ type UsuarioProviderProps = {
 };
 
 export const UsuarioProvider = ({ children }: UsuarioProviderProps) => {
-  const [saldo, setSaldo] = useState(1250);
+  // CAMBIO CRÍTICO: Iniciar en 0 en lugar de 1250
+  const [saldo, setSaldo] = useState(0);
   const [movimientos, setMovimientos] = useState<Movimiento[]>([]);
   const [patente, setPatente] = useState("");
   const [estacionamiento, setEstacionamiento] = useState<Estacionamiento | null>(null);
@@ -57,8 +59,7 @@ export const UsuarioProvider = ({ children }: UsuarioProviderProps) => {
     limite: 2,
   });
 
-  //Cargar estacionamiento al iniciar
-
+  // Cargar estacionamiento al iniciar
   useEffect(() => {
     const cargarEstacionamiento = async () => {
       try {
@@ -83,7 +84,7 @@ export const UsuarioProvider = ({ children }: UsuarioProviderProps) => {
     cargarEstacionamiento();
   }, []);
 
-  //Guardar estacionamiento cuando cambie
+  // Guardar estacionamiento cuando cambie
   useEffect(() => {
     const guardarEstacionamiento = async () => {
       try {
@@ -182,6 +183,20 @@ export const UsuarioProvider = ({ children }: UsuarioProviderProps) => {
     );
   };
 
+  // NUEVA FUNCIÓN: Limpiar datos al cerrar sesión
+  const limpiarDatos = () => {
+    console.log('Limpiando datos del usuario...');
+    setSaldo(0);
+    setMovimientos([]);
+    setPatente("");
+    setEstacionamiento(null);
+    
+    // Limpiar AsyncStorage
+    AsyncStorage.removeItem('estacionamientoActivo').catch(error => {
+      console.error('Error al limpiar AsyncStorage:', error);
+    });
+  };
+
   return (
     <UsuarioContext.Provider
       value={{
@@ -197,6 +212,7 @@ export const UsuarioProvider = ({ children }: UsuarioProviderProps) => {
         configEstacionamiento,
         actualizarConfigEstacionamiento: setConfigEstacionamiento,
         actualizarSaldoEstacionamiento,
+        limpiarDatos,
       }}
     >
       {children}
