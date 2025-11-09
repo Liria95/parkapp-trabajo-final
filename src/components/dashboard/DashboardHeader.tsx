@@ -1,5 +1,4 @@
 import React from 'react';
-import { Ionicons } from '@expo/vector-icons';
 import styled from 'styled-components/native';
 import { theme } from '../../config/theme';
 import { getResponsiveSize } from '../../utils/ResponsiveUtils';
@@ -7,7 +6,6 @@ import { getResponsiveSize } from '../../utils/ResponsiveUtils';
 interface DashboardHeaderProps {
   title: string;
   subtitle: string;
-  onMenuPress: () => void;
 }
 
 const Header = styled.View`
@@ -23,7 +21,6 @@ const HeaderContent = styled.View`
   flex: 1;
   flex-direction: column;
   justify-content: center;
-  margin-right: ${getResponsiveSize(15)}px;
 `;
 
 const HeaderTitle = styled.Text`
@@ -41,20 +38,9 @@ const HeaderSubtitle = styled.Text`
   flex-wrap: wrap;
 `;
 
-const MenuButton = styled.TouchableOpacity`
-  width: ${getResponsiveSize(40)}px;
-  height: ${getResponsiveSize(40)}px;
-  background-color: rgba(255, 255, 255, 0.2);
-  border-radius: ${getResponsiveSize(20)}px;
-  justify-content: center;
-  align-items: center;
-  flex-shrink: 0;
-`;
-
 const DashboardHeader: React.FC<DashboardHeaderProps> = ({
   title,
   subtitle,
-  onMenuPress,
 }) => {
   return (
     <Header>
@@ -62,9 +48,6 @@ const DashboardHeader: React.FC<DashboardHeaderProps> = ({
         <HeaderTitle>{title}</HeaderTitle>
         <HeaderSubtitle>{subtitle}</HeaderSubtitle>
       </HeaderContent>
-      <MenuButton onPress={onMenuPress}>
-        <Ionicons name="menu" size={getResponsiveSize(20)} color={theme.colors.white} />
-      </MenuButton>
     </Header>
   );
 };

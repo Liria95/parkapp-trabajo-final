@@ -18,16 +18,16 @@ import RegistroManualScreen from './src/screens/admin/RegistroManualScreen';
 import AdminPanel from './src/screens/admin/AdminPanel';
 
 // Importacion navegación de usuario
-import NavegadorTabsUsuario from './src/screens/user/navegacion/NavegadorTabs';
+import NavegadorPrincipalUsuario from './src/screens/user/navegacion/NavegadorPrincipal';
 
 // Context
-import { AuthProvider, AuthContext } from './src/components/shared/Context/AuthContext';
+import { AuthProvider, AuthContext } from './src/components/shared/Context/AuthContext/AuthContext';
 import { UsuarioProvider } from './src/screens/user/contexto/UsuarioContext';
 import { theme } from './src/config/theme';
 
 // Hooks de notificaciones
 import { useNotifications } from './src/hooks/useNotifications';
-import { useNotificationListener } from './src/services/NotificationListener'; // ✅ NUEVO
+import { useNotificationListener } from './src/services/NotificationListener';
 
 // Tipos de navegación
 export type AuthStackParamList = {
@@ -113,7 +113,7 @@ const AdminNavigator = () => (
 const UserNavigator = () => (
   <UsuarioProvider>
     <UserStack.Navigator screenOptions={{ headerShown: false }}>
-      <UserStack.Screen name="UserMain" component={NavegadorTabsUsuario} />
+      <UserStack.Screen name="UserMain" component={NavegadorPrincipalUsuario} />
     </UserStack.Navigator>
   </UsuarioProvider>
 );

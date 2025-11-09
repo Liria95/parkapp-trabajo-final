@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Alert } from 'react-native';
+import React, { useState, useEffect, useContext } from 'react';
+import { Alert, ActivityIndicator, Text } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
@@ -16,6 +16,9 @@ import AuthButton from '../../components/auth/AuthButton';
 import { Container } from '../../components/shared/StyledComponents';
 import UserHistorialModal from '../../components/modals/UserHistorialModal';
 
+// Servicios
+import { AdminUserService, UsuarioParaAdmin } from '../../services/AdminUserService';
+import { AuthContext } from '../../components/shared/Context/AuthContext/AuthContext';
 
 // Hooks
 import { useFormValidation } from '../../forms/useFormValidation';
@@ -35,28 +38,19 @@ type GestionUsuariosNavigationProp = NativeStackNavigationProp<
   'GestionUsuarios'
 >;
 
-interface Usuario {
-  id: string;
-  nombre: string;
-  email: string;
-  patente: string;
-  saldo: number;
-  telefono: string;
-  estado: 'activo' | 'inactivo';
-  ubicacionActual?: string;
-  fechaRegistro: string;
-  ultimaActividad: string;
-}
-
 const GestionUsuariosScreen: React.FC = () => {
   const navigation = useNavigation<GestionUsuariosNavigationProp>();
+  const authContext = useContext(AuthContext);
   
   const [filtroEstado, setFiltroEstado] = useState<string>('todos');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [showModal, setShowModal] = useState<boolean>(false);
   const [showHistorialModal, setShowHistorialModal] = useState<boolean>(false);
-  const [usuarioSeleccionado, setUsuarioSeleccionado] = useState<Usuario | null>(null);
+  const [usuarioSeleccionado, setUsuarioSeleccionado] = useState<UsuarioParaAdmin | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
+  const [loadingUsers, setLoadingUsers] = useState<boolean>(true);
+  
+  const [usuarios, setUsuarios] = useState<UsuarioParaAdmin[]>([]);
   
   const [nuevoUsuario, setNuevoUsuario] = useState({
     nombre: '',
@@ -68,32 +62,39 @@ const GestionUsuariosScreen: React.FC = () => {
 
   const { errors, validateForm, clearError } = useFormValidation();
 
-  // Mock data usuarios
-  const [usuarios] = useState<Usuario[]>([
-    {
-      id: '1',
-      nombre: 'JUAN PÉREZ',
-      email: 'juan.perez@email.com',
-      patente: 'ABC123',
-      saldo: 1250.00,
-      telefono: '+54 9 11 1234-5678',
-      estado: 'activo',
-      ubicacionActual: 'AV. SAN MARTÍN',
-      fechaRegistro: '15/01/2025',
-      ultimaActividad: 'Hace 5 minutos',
-    },
-    {
-      id: '2',
-      nombre: 'MARÍA GARCÍA',
-      email: 'maria.garcia@email.com',
-      patente: 'XYZ789',
-      saldo: 850.00,
-      telefono: '+54 9 11 8765-4321',
-      estado: 'inactivo',
-      fechaRegistro: '12/01/2025',
-      ultimaActividad: 'Hace 2 horas',
-    },
-  ]);
+  // Cargar usuarios al montar el componente
+  useEffect(() => {
+    cargarUsuarios();
+  }, []);
+
+  const cargarUsuarios = async () => {
+    const token = authContext?.state.token;
+    
+    if (!token) {
+      Alert.alert('Error', 'No hay token de autenticación');
+      setLoadingUsers(false);
+      return;
+    }
+
+    try {
+      setLoadingUsers(true);
+      console.log('Cargando usuarios desde Firebase...');
+      
+      const result = await AdminUserService.getAllUsers(token);
+      
+      if (result.success && result.users) {
+        console.log('Usuarios cargados:', result.users.length);
+        setUsuarios(result.users);
+      } else {
+        Alert.alert('Error', result.message || 'No se pudieron cargar los usuarios');
+      }
+    } catch (error) {
+      console.error('Error al cargar usuarios:', error);
+      Alert.alert('Error', 'Ocurrió un error al cargar los usuarios');
+    } finally {
+      setLoadingUsers(false);
+    }
+  };
 
   // Configuración de filtros
   const filtros = [
@@ -106,9 +107,8 @@ const GestionUsuariosScreen: React.FC = () => {
   const usuariosFiltrados = usuarios.filter(usuario => {
     const matchEstado = filtroEstado === 'todos' || usuario.estado === filtroEstado;
     const matchBusqueda = searchQuery === '' || 
-      usuario.nombre.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      usuario.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      usuario.patente.toLowerCase().includes(searchQuery.toLowerCase());
+      usuario.nombreCompleto.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      usuario.email.toLowerCase().includes(searchQuery.toLowerCase());
     
     return matchEstado && matchBusqueda;
   });
@@ -140,19 +140,24 @@ const GestionUsuariosScreen: React.FC = () => {
     const isValid = validateForm(nuevoUsuario, {
       nombre: { required: true, minLength: 2 },
       email: { required: true, email: true },
-      patente: { required: true, minLength: 6 },
       telefono: { required: true, phone: true },
     });
 
     if (isValid) {
       setLoading(true);
       
-      // Simular creación
+      // Implementar creación de usuario en el backend
       setTimeout(() => {
         Alert.alert(
           'Usuario Creado',
           `Usuario ${nuevoUsuario.nombre} registrado exitosamente`,
-          [{ text: 'OK', onPress: () => setShowModal(false) }]
+          [{ 
+            text: 'OK', 
+            onPress: () => {
+              setShowModal(false);
+              cargarUsuarios(); // Recargar lista
+            }
+          }]
         );
         
         setNuevoUsuario({ nombre: '', email: '', patente: '', telefono: '', saldoInicial: '' });
@@ -161,16 +166,28 @@ const GestionUsuariosScreen: React.FC = () => {
     }
   };
 
-  const handleVerHistorial = (usuario: Usuario) => {
+  const handleVerHistorial = (usuario: UsuarioParaAdmin) => {
     setUsuarioSeleccionado(usuario);
     setShowHistorialModal(true);
   };
+
+  const handleRefresh = () => {
+    cargarUsuarios();
+  };
+
+  if (loadingUsers) {
+    return (
+      <Container style={{ justifyContent: 'center', alignItems: 'center' }}>
+        <ActivityIndicator size="large" color="#4A90E2" />
+      </Container>
+    );
+  }
 
   return (
     <Container>
       <AppHeader
         title="Gestión de Usuarios"
-        subtitle="Administrar usuarios del sistema"
+        subtitle={`${usuarios.length} usuarios registrados`}
         onBackPress={() => navigation.goBack()}
         onRightPress={handleAddUserMenu}
         rightIconName="person-add"
@@ -179,7 +196,7 @@ const GestionUsuariosScreen: React.FC = () => {
       <SearchBar
         value={searchQuery}
         onChangeText={setSearchQuery}
-        placeholder="Buscar por patente/email/nombre"
+        placeholder="Buscar por nombre o email"
       />
 
       <FilterButtons
@@ -192,11 +209,29 @@ const GestionUsuariosScreen: React.FC = () => {
         {usuariosFiltrados.map(usuario => (
           <UserDetailCard
             key={usuario.id}
-            usuario={usuario}
-            onPress={handleVerHistorial}
+            usuario={{
+              id: usuario.id,
+              nombre: usuario.nombreCompleto,
+              email: usuario.email,
+              patente: 'N/A', // obtener de vehículos
+              saldo: usuario.balance,
+              telefono: usuario.phone,
+              estado: usuario.estado,
+              fechaRegistro: usuario.fechaRegistro,
+              ultimaActividad: usuario.ultimaActividad,
+            }}
+            onPress={() => handleVerHistorial(usuario)}
           />
         ))}
       </ResponsiveGrid>
+
+      {usuariosFiltrados.length === 0 && !loadingUsers && (
+        <Container style={{ justifyContent: 'center', alignItems: 'center', flex: 1 }}>
+          <Text style={{ fontSize: 16, color: '#666' }}>
+            No se encontraron usuarios
+          </Text>
+        </Container>
+      )}
 
       {/* Modal Crear Usuario */}
       <AppModal
@@ -223,17 +258,6 @@ const GestionUsuariosScreen: React.FC = () => {
             error={errors.email}
             keyboardType="email-address"
             autoCapitalize="none"
-          />
-
-          <InputField
-            label="Patente"
-            iconName="car-outline"
-            placeholder="ABC123"
-            value={nuevoUsuario.patente}
-            onChangeText={(text) => handleInputChange('patente', text.toUpperCase())}
-            error={errors.patente}
-            autoCapitalize="characters"
-            maxLength={6}
           />
 
           <InputField
@@ -266,11 +290,20 @@ const GestionUsuariosScreen: React.FC = () => {
       {/* Modal Historial Usuario */}
       <AppModal
         visible={showHistorialModal}
-        title={`Historial - ${usuarioSeleccionado?.nombre}`}
+        title={`Historial - ${usuarioSeleccionado?.nombreCompleto}`}
         onClose={() => setShowHistorialModal(false)}
       >
         {usuarioSeleccionado && (
-          <UserHistorialModal usuario={usuarioSeleccionado} />
+          <UserHistorialModal usuario={{
+            nombre: usuarioSeleccionado.nombreCompleto,
+            email: usuarioSeleccionado.email,
+            patente: 'N/A',
+            saldo: usuarioSeleccionado.balance,
+            telefono: usuarioSeleccionado.phone,
+            estado: usuarioSeleccionado.estado,
+            fechaRegistro: usuarioSeleccionado.fechaRegistro,
+            ultimaActividad: usuarioSeleccionado.ultimaActividad,
+          }} />
         )}
       </AppModal>
     </Container>

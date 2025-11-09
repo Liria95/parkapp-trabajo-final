@@ -4,7 +4,7 @@ import TarjetaGradiente from "../../componentes/TarjetaGradiente";
 import BotonPrimSec from "../../componentes/Boton";
 import { theme } from "../../../../config/theme";
 import { UsuarioContext } from "../../contexto/UsuarioContext";
-import { AuthContext } from "../../../../components/shared/Context/AuthContext";
+import { AuthContext } from "../../../../components/shared/Context/AuthContext/AuthContext";
 import { NotificationService } from "../../../../services/NotificationService";
 import { PaymentService } from "../../../../services/PaymentService";
 import { BalanceService } from "../../../../services/BalanceService";

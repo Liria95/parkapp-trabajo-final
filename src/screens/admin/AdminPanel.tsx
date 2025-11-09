@@ -1,19 +1,21 @@
-import { theme } from '../../config/theme' ;
-import { StyleSheet, View, Text, TouchableOpacity, Alert, FlatList} from "react-native";
+import { theme } from '../../config/theme';
+import { StyleSheet, View, Text, TouchableOpacity, Alert, FlatList, ActivityIndicator } from "react-native";
 import { DrawerActions, useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useContext, useEffect, useState } from 'react';
 import styled from 'styled-components/native';
 import { getDynamicSpacing, getResponsiveSize } from '../../utils/ResponsiveUtils';
 
-
 // Componentes reutilizables
 import { Container } from '../../components/shared/StyledComponents';
 import AppHeader from '../../components/common/AppHeader';
 import StatsGrid from '../../components/dashboard/StatsGrid';
 import InfoCard from '../../components/adminpanel/InfoCard';
-import { AUTH_ACTIONS, AuthContext } from '../../components/shared/Context/AuthContext';
+import { AUTH_ACTIONS, AuthContext } from '../../components/shared/Context/AuthContext/AuthContext';
 
+// Servicios
+import { AdminUserService } from '../../services/AdminUserService';
+import { FinesService } from '../../services/FinesService';
 
 // navegación
 type RootStackParamList = {
@@ -50,205 +52,318 @@ const UserText = styled.Text`
 interface User {
   id: string;
   nombre: string;
-  tipo: 'frecuente' | 'nuevo' | 'moroso';
-  multas: number;
+  email: string;
+  saldo: number;
+  estado: 'activo' | 'inactivo';
+  ultimaActividad: string;
+  multasPendientes?: number;
 }
 
-export default function AdminPanel () {
+interface Stats {
+  totalUsers: number;
+  activeUsers: number;
+  inactiveUsers: number;
+  totalBalance: string;
+  averageBalance: string;
+  activeAdmins?: number;
+  pendingFines?: number;
+}
 
-    const navigation = useNavigation<AdminPanelNavigationProp>();
+export default function AdminPanel() {
+  const navigation = useNavigation<AdminPanelNavigationProp>();
+  const authContext = useContext(AuthContext);
 
+  const [usuarios, setUsuarios] = useState<User[]>([]);
+  const [stats, setStats] = useState<Stats | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [usuarioSeleccionado, setUsuarioSeleccionado] = useState<User | null>(null);
+  
+  // Estado para histórico
+  const [historyData, setHistoryData] = useState({
+    yesterday: { users: 0, revenue: 0 },
+    lastWeek: { users: 0, revenue: 0 },
+  });
 
-    // Mock datos
-    const [stats, setStats] = useState({
-        ocupacion: 92,
-        ingresosHoy: 24580,
-        multasPendientes: 12,
-        adminsActivos: 3,
-    });
+  // Cargar datos al montar
+  useEffect(() => {
+    cargarDatos();
+  }, []);
 
-    const [comparativa, setComparativa] = useState({
-        ingresos: '+12%',
-        ocupacion: '-3%',
-        multas: '+5%',
-    });
+  const cargarDatos = async () => {
+    const token = authContext?.state.token;
 
-    const [usuarios] = useState<User[]>([
-        { id: '1', nombre: 'Juan Pérez', tipo: 'frecuente', multas: 0 },
-        { id: '2', nombre: 'María García', tipo: 'moroso', multas: 3 },
-        { id: '3', nombre: 'Ana López', tipo: 'nuevo', multas: 0 },
-        { id: '4', nombre: 'Carlos Gómez', tipo: 'moroso', multas: 5 },
-    ]);
-
-    const [usuarioSeleccionado, setUsuarioSeleccionado] = useState<User | null>(null);
-
-    // Alerta si ocupación supera 95%
-    useEffect(() => {
-        if (stats.ocupacion > 95) {
-            Alert.alert(
-            '⚠️ Alerta de Ocupación',
-            'La ocupación ha superado el 95%. Considere liberar espacios o ajustar tarifas.'
-        );
-        }
-    }, [stats.ocupacion]);
-
-    //Historial ingresos y ocupaciones anteriores
-    const historyStats = [
-      {
-        id: 'yesterday-occupancy',
-        label: 'Ocupación Ayer',
-        value: '88%',
-        trend: '-4%',
-      },
-      {
-        id: 'yesterday-revenue',
-        label: 'Ingresos Ayer',
-        value: '$20.500',
-        trend: '+2%',
-      },
-      {
-        id: 'last-week-occupancy',
-        label: 'Ocupación Miércoles Pasado',
-        value: '91%',
-        trend: '+1%',
-      },
-      {
-        id: 'last-week-revenue',
-        label: 'Ingresos Miércoles Pasado',
-        value: '$21.700',
-        trend: '-3%',
-      },
-    ];
-
-    // Configuración de StatsGrid
-    const statsConfig = [
-      {
-          id: 'ocupacion',
-          number: `${stats.ocupacion}%`,
-          label: 'Ocupación Actual',
-          backgroundColor: theme.colors.primary,
-      },
-      {
-          id: 'ingresos',
-          number: `$${stats.ingresosHoy}`,
-          label: 'Ingresos Hoy',
-          backgroundColor: theme.colors.success,
-      },
-      {
-          id: 'multas',
-          number: stats.multasPendientes,
-          label: 'Multas Pendientes',
-          backgroundColor: theme.colors.danger,
-      },
-      {
-          id: 'admins',
-          number: stats.adminsActivos,
-          label: 'Admins Activos',
-          backgroundColor: theme.colors.warning,
-      },
-    ];
-
-    const handleUsuarioPress = (usuario: User) => {
-        setUsuarioSeleccionado(usuario);
-        Alert.alert(`Ver usuario ${usuario.nombre}`, 'Detalle del usuario')
-    };
-
-    const getUserColor = (tipo: User['tipo']) => {
-        switch(tipo) {
-            case 'frecuente': return theme.colors.success;
-            case 'nuevo': return theme.colors.primary;
-            case 'moroso': return theme.colors.danger;
-            default: return theme.colors.gray;
-        }
+    if (!token) {
+      Alert.alert('Error', 'No hay token de autenticación');
+      setLoading(false);
+      return;
     }
 
-    return (
-        <Container>
-            <StatsGrid stats={statsConfig} />
+    try {
+      setLoading(true);
+      console.log('Cargando datos del dashboard...');
+
+      // Cargar usuarios, estadísticas, multas e histórico en paralelo
+      const [usuariosResult, statsResult, finesResult, historyResult] = await Promise.all([
+        AdminUserService.getAllUsers(token),
+        AdminUserService.getStats(token),
+        FinesService.getAllFines(token),
+        AdminUserService.getHistoryStats(token),
+      ]);
+
+      if (usuariosResult.success && usuariosResult.users) {
+        console.log('Usuarios cargados:', usuariosResult.users.length);
         
-            {/* Histórico de días anteriores */}
-            <Section>
-              <SectionTitle>Histórico reciente</SectionTitle>
-              <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center'}}>
-                {historyStats.map((item) => (
-                  <InfoCard
-                    key={item.id}
-                    label={item.label}
-                    value={item.value}
-                    trend={item.trend}
-                    backgroundColor={theme.colors.lightGray}
-                  />
-                ))}
+        // Contar multas pendientes por usuario
+        const multasPorUsuario = new Map<string, number>();
+        if (finesResult.success && finesResult.fines) {
+          finesResult.fines.forEach(fine => {
+            if (fine.estado === 'pendiente') {
+              const count = multasPorUsuario.get(fine.userId) || 0;
+              multasPorUsuario.set(fine.userId, count + 1);
+            }
+          });
+        }
+        
+        // Formatear usuarios para el dashboard con multas
+        const usuariosFormateados = usuariosResult.users.map(user => ({
+          id: user.id,
+          nombre: user.nombreCompleto,
+          email: user.email,
+          saldo: user.balance,
+          estado: user.estado,
+          ultimaActividad: user.ultimaActividad,
+          multasPendientes: multasPorUsuario.get(user.id) || 0,
+        }));
+
+        setUsuarios(usuariosFormateados);
+      }
+
+      if (statsResult.success && statsResult.stats) {
+        console.log('Estadísticas cargadas:', statsResult.stats);
+        
+        // Calcular total de multas pendientes
+        let pendingFines = 0;
+        if (finesResult.success && finesResult.fines) {
+          pendingFines = finesResult.fines.filter(f => f.estado === 'pendiente').length;
+        }
+        
+        setStats({
+          ...statsResult.stats,
+          pendingFines
+        });
+      }
+
+      // Cargar datos históricos
+      if (historyResult.success && historyResult.history) {
+        console.log('Histórico cargado:', historyResult.history);
+        setHistoryData({
+          yesterday: {
+            users: historyResult.history.yesterday.activeUsers,
+            revenue: parseFloat(historyResult.history.yesterday.revenue),
+          },
+          lastWeek: {
+            users: historyResult.history.lastWeek.activeUsers,
+            revenue: parseFloat(historyResult.history.lastWeek.revenue),
+          },
+        });
+      }
+
+    } catch (error) {
+      console.error('Error al cargar datos:', error);
+      Alert.alert('Error', 'Ocurrió un error al cargar los datos');
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  };
+
+  const handleRefresh = () => {
+    setRefreshing(true);
+    cargarDatos();
+  };
+
+  // Histórico de días anteriores con datos reales
+  const historyStats = [
+    {
+      id: 'yesterday-occupancy',
+      label: 'Ocupación Ayer',
+      value: historyData.yesterday.users > 0 ? `${historyData.yesterday.users}` : '-',
+      trend: stats ? `${((historyData.yesterday.users - stats.activeUsers) / stats.activeUsers * 100).toFixed(0)}%` : '0%',
+    },
+    {
+      id: 'yesterday-revenue',
+      label: 'Ingresos Ayer',
+      value: historyData.yesterday.revenue > 0 ? `$${historyData.yesterday.revenue.toFixed(0)}` : '$0',
+      trend: stats ? `${((historyData.yesterday.revenue - parseFloat(stats.totalBalance)) / parseFloat(stats.totalBalance) * 100).toFixed(0)}%` : '0%',
+    },
+    {
+      id: 'last-week-occupancy',
+      label: 'Ocupación Semana Pasada',
+      value: historyData.lastWeek.users > 0 ? `${historyData.lastWeek.users}` : '-',
+      trend: stats ? `${((historyData.lastWeek.users - stats.activeUsers) / stats.activeUsers * 100).toFixed(0)}%` : '0%',
+    },
+    {
+      id: 'last-week-revenue',
+      label: 'Ingresos Semana Pasada',
+      value: historyData.lastWeek.revenue > 0 ? `$${historyData.lastWeek.revenue.toFixed(0)}` : '$0',
+      trend: stats ? `${((historyData.lastWeek.revenue - parseFloat(stats.totalBalance)) / parseFloat(stats.totalBalance) * 100).toFixed(0)}%` : '0%',
+    },
+  ];
+
+  // Configuración de StatsGrid con datos reales (usando las mismas labels originales)
+  const statsConfig = stats ? [
+    {
+      id: 'ocupacion',
+      number: stats.activeUsers, // Mostrar usuarios activos en lugar de ocupación
+      label: 'Ocupación Actual',
+      backgroundColor: theme.colors.primary,
+    },
+    {
+      id: 'ingresos',
+      number: `$${stats.totalBalance}`,
+      label: 'Ingresos Hoy',
+      backgroundColor: theme.colors.success,
+    },
+    {
+      id: 'multas',
+      number: stats.pendingFines || 0, // Multas pendientes reales desde Firebase
+      label: 'Multas Pendientes',
+      backgroundColor: theme.colors.danger,
+    },
+    {
+      id: 'admins',
+      number: stats.activeAdmins || 0, // Admins activos desde Firebase
+      label: 'Admins Activos',
+      backgroundColor: theme.colors.warning,
+    },
+  ] : [];
+
+  const handleUsuarioPress = (usuario: User) => {
+    setUsuarioSeleccionado(usuario);
+    Alert.alert(
+      usuario.nombre,
+      `Email: ${usuario.email}\nSaldo: $${usuario.saldo}\nEstado: ${usuario.estado}\nÚltima actividad: ${usuario.ultimaActividad}`,
+      [
+        { text: 'Cerrar', style: 'cancel' },
+        { text: 'Ver más', onPress: () => console.log('Ver más detalles') }
+      ]
+    );
+  };
+
+  const getUserColor = (estado: User['estado']) => {
+    switch (estado) {
+      case 'activo': return theme.colors.success;
+      case 'inactivo': return theme.colors.gray;
+      default: return theme.colors.gray;
+    }
+  };
+
+  if (loading) {
+    return (
+      <Container style={{ justifyContent: 'center', alignItems: 'center' }}>
+        <ActivityIndicator size="large" color={theme.colors.primary} />
+        <Text style={{ marginTop: 10, color: theme.colors.gray }}>
+          Cargando dashboard...
+        </Text>
+      </Container>
+    );
+  }
+
+  return (
+    <Container>
+      {stats && <StatsGrid stats={statsConfig} />}
+
+      {/* Histórico de días anteriores */}
+      <Section>
+        <SectionTitle>Histórico reciente</SectionTitle>
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center' }}>
+          {historyStats.map((item) => (
+            <InfoCard
+              key={item.id}
+              label={item.label}
+              value={item.value}
+              trend={item.trend}
+              backgroundColor={theme.colors.lightGray}
+            />
+          ))}
+        </View>
+      </Section>
+
+      <SectionTitle>Usuarios HOY</SectionTitle>
+      
+      {usuarios.length === 0 ? (
+        <View style={{ padding: 20, alignItems: 'center' }}>
+          <Text style={{ color: theme.colors.gray }}>No hay usuarios registrados</Text>
+        </View>
+      ) : (
+        <FlatList
+          data={usuarios}
+          refreshing={refreshing}
+          onRefresh={handleRefresh}
+          keyExtractor={(usuario) => usuario.id}
+          contentContainerStyle={{ paddingHorizontal: 16 }}
+          renderItem={({ item }) => (
+            <TouchableOpacity
+              style={styles.userCard}
+              onPress={() => handleUsuarioPress(item)}
+            >
+              <View style={[styles.userAvatar, { backgroundColor: getUserColor(item.estado) }]}>
+                <Text style={styles.userAvatarText}>{item.nombre[0]}</Text>
               </View>
-            </Section>
-            
-            <SectionTitle>Usuarios HOY</SectionTitle>
-            <FlatList
-              data={usuarios}
-              refreshing={true}
-              keyExtractor={(usuario) => usuario.id}
-              contentContainerStyle={{ paddingHorizontal: 16 }} //igual que StatsGrid
-              renderItem={({ item }) => (
-                <TouchableOpacity
-                  style={styles.userCard}
-                  onPress={() => handleUsuarioPress(item)}
-                >
-                  <View style={[styles.userAvatar, { backgroundColor: getUserColor(item.tipo) }]}>
-                    <Text style={styles.userAvatarText}>{item.nombre[0]}</Text>
-                  </View>
-                  <View style={styles.userInfo}>
-                    <Text style={styles.userName}>{item.nombre}</Text>
-                    <Text style={styles.userDetails}>
-                      {item.tipo.toUpperCase()} | Multas: {item.multas}
-                    </Text>
-                  </View>
-                </TouchableOpacity>
-              )}
-            />     
-                
-            
-        </Container>
-    )
+              <View style={styles.userInfo}>
+                <Text style={styles.userName}>{item.nombre}</Text>
+                <Text style={styles.userDetails}>
+                  {item.estado.toUpperCase()} | Multas: {item.multasPendientes || 0}
+                </Text>
+              </View>
+            </TouchableOpacity>
+          )}
+        />
+      )}
+    </Container>
+  );
 }
 
 const styles = StyleSheet.create({
-    userCard: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      backgroundColor: '#f8f8f8',
-      borderRadius: 12,
-      padding: 12,
-      marginBottom: 10,
-      elevation: 3, // para Android sombra
-      shadowColor: '#000', // para iOS sombra
-      shadowOffset: { width: 0, height: 2 },
-      shadowOpacity: 0.1,
-      shadowRadius: 4,
-    },
-    userAvatar: {
-      width: 48,
-      height: 48,
-      borderRadius: 24,
-      backgroundColor: '#aaa',
-      justifyContent: 'center',
-      alignItems: 'center',
-      marginRight: 12,
-    },
-    userAvatarText: {
-      color: '#fff',
-      fontWeight: 'bold',
-      fontSize: 16,
-    },
-    userInfo: {
-      flex: 1,
-    },
-    userName: {
-      fontSize: 16,
-      fontWeight: '600',
-      color: theme.colors.dark,
-    },
-    userDetails: {
-      fontSize: 14,
-      color: theme.colors.gray,
-    },
+  userCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f8f8f8',
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 10,
+    elevation: 3,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+  },
+  userAvatar: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#aaa',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  userAvatarText: {
+    color: '#fff',
+    fontWeight: 'bold',
+    fontSize: 16,
+  },
+  userInfo: {
+    flex: 1,
+  },
+  userName: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: theme.colors.dark,
+  },
+  userDetails: {
+    fontSize: 14,
+    color: theme.colors.gray,
+    marginTop: 2,
+  },
 });

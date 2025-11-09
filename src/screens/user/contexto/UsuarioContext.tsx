@@ -1,6 +1,7 @@
-import React, { createContext, useState, useEffect, ReactNode } from "react";
+import React, { createContext, useState, useEffect, ReactNode, useContext } from "react";
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { NotificationService } from "../../../services/NotificationService";
+import { AuthContext } from "../../../components/shared/Context/AuthContext/AuthContext";
 
 type Movimiento = { tipo: "Recarga" | "Estacionamiento"; monto: number };
 
@@ -48,7 +49,9 @@ type UsuarioProviderProps = {
 };
 
 export const UsuarioProvider = ({ children }: UsuarioProviderProps) => {
-  // CAMBIO CRÍTICO: Iniciar en 0 en lugar de 1250
+  const authContext = useContext(AuthContext);
+  
+  // Iniciar en 0 en lugar de 1250
   const [saldo, setSaldo] = useState(0);
   const [movimientos, setMovimientos] = useState<Movimiento[]>([]);
   const [patente, setPatente] = useState("");
@@ -104,6 +107,14 @@ export const UsuarioProvider = ({ children }: UsuarioProviderProps) => {
 
     guardarEstacionamiento();
   }, [estacionamiento]);
+
+  // Limpiar datos cuando el usuario cierre sesión
+  useEffect(() => {
+    if (!authContext.state.isAuthenticated) {
+      console.log('Usuario desautenticado - Limpiando datos...');
+      limpiarDatos();
+    }
+  }, [authContext.state.isAuthenticated]);
 
   const agregarMovimiento = (mov: Movimiento) => {
     setMovimientos((prev) => [...prev, mov]);
@@ -183,7 +194,7 @@ export const UsuarioProvider = ({ children }: UsuarioProviderProps) => {
     );
   };
 
-  // NUEVA FUNCIÓN: Limpiar datos al cerrar sesión
+  // Limpiar datos al cerrar sesión
   const limpiarDatos = () => {
     console.log('Limpiando datos del usuario...');
     setSaldo(0);

@@ -13,7 +13,7 @@ import LinkButton from '../../components/common/LinkButton';
 import { useFormValidation } from '../../forms/useFormValidation';
 import { AuthService } from '../../services/AuthService';
 
-import { AUTH_ACTIONS, AuthContext } from '../../components/shared/Context/AuthContext';
+import { AUTH_ACTIONS, AuthContext } from '../../components/shared/Context/AuthContext/AuthContext';
 
 // Tipos
 interface NavigationProp {

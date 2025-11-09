@@ -7,7 +7,7 @@ import BotonPrimSec from "../../componentes/Boton";
 import InfoEstacionamiento from "../../componentes/InfoEstacionamiento";
 import { theme } from "../../../../config/theme";
 import { UsuarioContext } from "../../contexto/UsuarioContext";
-import { AuthContext } from "../../../../components/shared/Context/AuthContext";
+import { AuthContext } from "../../../../components/shared/Context/AuthContext/AuthContext";
 import { RutasStackParamList } from "../../tipos/RutasStack";
 
 export default function RegistrarVehiculo() {

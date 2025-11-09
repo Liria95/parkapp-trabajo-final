@@ -4,11 +4,13 @@ import { theme } from "../../../../config/theme";
 import InfoUsuario from "./InfoUsuario";
 import OpcionMenu from "./OpcionMenu";
 import BotonCerrarSesion from "./BotonCerrarSesion";
-import { AuthContext, AUTH_ACTIONS } from '../../../../components/shared/Context/AuthContext';
+import { AuthContext, AUTH_ACTIONS } from '../../../../components/shared/Context/AuthContext/AuthContext';
 import { API_URLS } from '../../../../config/api.config';
+import { useNavigation } from '@react-navigation/native';
 
 export default function Perfil() {
   const { dispatch, state } = useContext(AuthContext);
+  const navigation = useNavigation<any>();
 
   const usuario = {
     nombre: state.user?.name || "Usuario",
@@ -20,31 +22,31 @@ export default function Perfil() {
   const nombreCompleto = `${usuario.nombre} ${usuario.apellido}`.trim();
 
   const opcionesMenu = [
-    { id: 1, titulo: "Mis vehículos", icono: "car-sport" as const },
-    { id: 2, titulo: "Notificaciones", icono: "notifications" as const },
-    { id: 3, titulo: "Métodos de pago", icono: "card" as const },
-    { id: 4, titulo: "Infracciones pendientes", icono: "warning" as const },
-    { id: 5, titulo: "Configuración", icono: "settings" as const },
+    { id: 1, titulo: "Mis vehículos", icono: "car-sport" as const, screen: null },
+    { id: 2, titulo: "Notificaciones", icono: "notifications" as const, screen: 'NotificationsScreen' },
+    { id: 3, titulo: "Infracciones pendientes", icono: "warning" as const, screen: 'InfraccionesPendientes' },
+    { id: 4, titulo: "Configuración", icono: "settings" as const, screen: 'Configuracion' },
   ];
 
-  const handleOpcionPress = (titulo: string) => {
+  const handleOpcionPress = (titulo: string, screen: string | null) => {
     console.log("Navegando a:", titulo);
+    if (screen) {
+      navigation.navigate(screen);
+    } else {
+      Alert.alert('Próximamente', `La sección "${titulo}" estará disponible pronto`);
+    }
   };
 
   const handleAvatarChange = async (uri: string) => {
     try {
       console.log('Nueva foto seleccionada:', uri);
 
-      // Validar que hay token
       if (!state.token) {
         Alert.alert('Error', 'No hay token de autenticación');
         return;
       }
 
-      // Crear FormData para subir la imagen
       const formData = new FormData();
-      
-      // Extraer información del archivo
       const filename = uri.split('/').pop() || 'profile.jpg';
       const match = /\.(\w+)$/.exec(filename);
       const type = match ? `image/${match[1]}` : 'image/jpeg';
@@ -55,28 +57,17 @@ export default function Perfil() {
         name: filename,
       } as any);
 
-      console.log('Subiendo foto al servidor...');
-      console.log('Archivo:', { filename, type });
-      console.log('URL:', `${API_URLS.USERS}/profile-photo`);
-
       const response = await fetch(`${API_URLS.USERS}/profile-photo`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${state.token}`,
-          // NO agregar Content-Type, FormData lo maneja automáticamente
         },
         body: formData,
       });
 
-      console.log('Response status:', response.status);
-
       const data = await response.json();
-      console.log('Respuesta del servidor:', data);
-
       if (response.ok && data.success) {
         Alert.alert('Éxito', 'Foto de perfil actualizada');
-
-        // Actualizar contexto correctamente con user anidado
         dispatch({
           type: AUTH_ACTIONS.UPDATE_USER,
           payload: {
@@ -86,8 +77,6 @@ export default function Perfil() {
             }
           },
         });
-
-        console.log('Avatar actualizado en contexto:', data.photoUrl);
       } else {
         Alert.alert('Error', data.message || 'No se pudo actualizar la foto');
       }
@@ -95,7 +84,7 @@ export default function Perfil() {
     } catch (error) {
       console.error('Error al subir foto:', error);
       Alert.alert(
-        'Error de conexión', 
+        'Error de conexión',
         'No se pudo conectar con el servidor. Verifica:\n\n' +
         '1. Que el backend esté corriendo\n' +
         '2. Que tu celular y PC estén en la misma WiFi\n' +
@@ -141,7 +130,7 @@ export default function Perfil() {
             key={opcion.id}
             titulo={opcion.titulo}
             icono={opcion.icono}
-            onPress={() => handleOpcionPress(opcion.titulo)}
+            onPress={() => handleOpcionPress(opcion.titulo, opcion.screen)}
           />
         ))}
       </View>

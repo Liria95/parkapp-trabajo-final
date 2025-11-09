@@ -2,7 +2,7 @@ import { createDrawerNavigator, DrawerContentScrollView, DrawerItem, DrawerItemL
 import AdminPanel from './AdminPanel';
 import ConfiguracionesScreen from './Configuraciones';
 import { useContext } from 'react';
-import { AUTH_ACTIONS, AuthContext } from '../../components/shared/Context/AuthContext';
+import { AUTH_ACTIONS, AuthContext } from '../../components/shared/Context/AuthContext/AuthContext';
 import { CommonActions } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 

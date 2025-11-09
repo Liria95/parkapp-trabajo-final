@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Alert, ScrollView } from 'react-native';
+import React, { useState, useEffect, useContext } from 'react';
+import { Alert, ScrollView, ActivityIndicator, Text } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
@@ -12,9 +12,13 @@ import SectionHeader from '../../components/common/SectionHeader';
 import InfractionCard from '../../components/infractions/InfractionCard';
 import CreateInfractionModal from '../../components/infractions/CreateInfractionModal';
 import { Container } from '../../components/shared/StyledComponents';
+import { AuthContext } from '../../components/shared/Context/AuthContext/AuthContext';
+
+// Servicios
+import { FinesService, FineForDisplay } from '../../services/FinesService';
 
 // Theme y utils
-import { theme } from '../../config/theme' ;
+import { theme } from '../../config/theme';
 import { getDynamicSpacing, breakpoints } from '../../utils/ResponsiveUtils';
 
 // Tipos
@@ -30,6 +34,7 @@ type InfraccionesScreenNavigationProp = NativeStackNavigationProp<RootStackParam
 
 type FilterType = 'todas' | 'pendiente' | 'pagada' | 'cancelada';
 
+// Interface compatible con InfractionCard
 interface Infraccion {
   id: string;
   numero: string;
@@ -48,13 +53,12 @@ interface NuevaInfraccion {
   ubicacion: string;
 }
 
-// Contenedor principal de contenido
+// Styled Components
 const ContentContainer = styled.View`
   flex: 1;
   padding: 0 ${getDynamicSpacing(20)}px;
 `;
 
-// Contenedores de cards responsive
 const CardsContainer = styled.View`
   flex: 1;
 `;
@@ -97,14 +101,19 @@ const getCardColumns = (): number => {
   if (breakpoints.isLargeTablet) return 2;
   if (breakpoints.isTablet && breakpoints.isLandscape) return 2;
   if (breakpoints.isTablet) return 1;
-  return 1; // Móviles siempre 1 columna
+  return 1;
 };
 
 const InfraccionesScreen: React.FC = () => {
   const navigation = useNavigation<InfraccionesScreenNavigationProp>();
-  
+  const authContext = useContext(AuthContext);
+
   const [filtroActivo, setFiltroActivo] = useState<FilterType>('todas');
   const [showModal, setShowModal] = useState<boolean>(false);
+  const [infracciones, setInfracciones] = useState<Infraccion[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [refreshing, setRefreshing] = useState<boolean>(false);
+
   const [nuevaInfraccion, setNuevaInfraccion] = useState<NuevaInfraccion>({
     patente: '',
     motivo: '',
@@ -112,30 +121,74 @@ const InfraccionesScreen: React.FC = () => {
     ubicacion: '',
   });
 
-  // Datos de ejemplo
-  const [infracciones] = useState<Infraccion[]>([
-    { id: '1', numero: '001234', patente: 'ABC123', motivo: 'TIEMPO EXCEDIDO', monto: 2500, fecha: '30/08/2025 14:30', estado: 'pendiente', ubicacion: 'AV. SAN MARTÍN 123' },
-    { id: '2', numero: '001235', patente: 'XYZ789', motivo: 'SIN REGISTRO', monto: 2500, fecha: '29/08/2025 10:15', estado: 'pagada', ubicacion: 'AV. BELGRANO 456' },
-    { id: '3', numero: '001236', patente: 'DEF456', motivo: 'ESTACIONAMIENTO PROHIBIDO', monto: 3000, fecha: '28/08/2025 16:45', estado: 'pendiente', ubicacion: 'CALLE CORRIENTES 789' },
-    { id: '4', numero: '001237', patente: 'GHI789', motivo: 'NO PAGO TARIFA', monto: 2000, fecha: '27/08/2025 12:20', estado: 'cancelada', ubicacion: 'AV. RIVADAVIA 321' },
-    { id: '5', numero: '001238', patente: 'JKL012', motivo: 'ZONA PROHIBIDA', monto: 3500, fecha: '26/08/2025 09:15', estado: 'pagada', ubicacion: 'PLAZA CENTRAL 101' },
-    { id: '6', numero: '001239', patente: 'MNO345', motivo: 'TIEMPO EXCEDIDO', monto: 2500, fecha: '25/08/2025 17:30', estado: 'cancelada', ubicacion: 'AV. INDEPENDENCIA 567' },
-  ]);
+  // Cargar infracciones al montar
+  useEffect(() => {
+    cargarInfracciones();
+  }, []);
 
-  const infraccionesFiltradas = infracciones.filter(inf => 
+  const cargarInfracciones = async () => {
+    const token = authContext?.state.token;
+
+    if (!token) {
+      Alert.alert('Error', 'No hay token de autenticación');
+      setLoading(false);
+      return;
+    }
+
+    try {
+      setLoading(true);
+      console.log('Cargando infracciones desde Firebase...');
+
+      const result = await FinesService.getAllFines(token);
+
+      if (result.success && result.fines) {
+        console.log('Infracciones cargadas:', result.fines.length);
+        
+        // Mapear a la interface que espera InfractionCard
+        const infraccionesMapeadas: Infraccion[] = result.fines.map(fine => ({
+          id: fine.id,
+          numero: fine.numero,
+          patente: fine.patente,
+          motivo: fine.motivo,
+          monto: fine.monto,
+          fecha: fine.fecha,
+          estado: fine.estado,
+          ubicacion: fine.ubicacion,
+        }));
+        
+        setInfracciones(infraccionesMapeadas);
+      } else {
+        Alert.alert('Error', result.message || 'No se pudieron cargar las infracciones');
+      }
+    } catch (error) {
+      console.error('Error al cargar infracciones:', error);
+      Alert.alert('Error', 'Ocurrió un error al cargar las infracciones');
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  };
+
+  const handleRefresh = () => {
+    setRefreshing(true);
+    cargarInfracciones();
+  };
+
+  const infraccionesFiltradas = infracciones.filter(inf =>
     filtroActivo === 'todas' || inf.estado === filtroActivo
   );
 
   // Handlers
-  const handleCrearInfraccion = (): void => {
+  const handleCrearInfraccion = async (): Promise<void> => {
     if (!nuevaInfraccion.patente || !nuevaInfraccion.motivo || !nuevaInfraccion.monto || !nuevaInfraccion.ubicacion) {
       Alert.alert('Error', 'Todos los campos son obligatorios');
       return;
     }
-    
+
+    // Implementar creación con userId
     Alert.alert(
-      'Infracción Creada', 
-      `Nueva infracción creada para patente ${nuevaInfraccion.patente}`, 
+      'Funcionalidad pendiente',
+      'Para crear una infracción necesitas seleccionar un usuario. Esta funcionalidad estará disponible próximamente.',
       [{ text: 'OK', onPress: () => handleCloseModal() }]
     );
   };
@@ -150,13 +203,43 @@ const InfraccionesScreen: React.FC = () => {
   };
 
   const handleGestionarInfraccion = (infraccion: Infraccion): void => {
+    const token = authContext?.state.token;
+
+    if (!token) {
+      Alert.alert('Error', 'No hay token de autenticación');
+      return;
+    }
+
     Alert.alert(
       `Infracción #${infraccion.numero}`,
-      `Patente: ${infraccion.patente}\nEstado: ${infraccion.estado.toUpperCase()}`,
+      `Patente: ${infraccion.patente}\nEstado: ${infraccion.estado.toUpperCase()}\nMonto: $${infraccion.monto}`,
       [
         { text: 'Cancelar', style: 'cancel' },
-        { text: 'Ver Detalles', onPress: () => console.log('Ver detalles') },
-        { text: 'Cambiar Estado', onPress: () => console.log('Cambiar estado') },
+        {
+          text: 'Marcar como Pagada',
+          onPress: async () => {
+            const result = await FinesService.updateFineStatus(infraccion.id, 'pagada', token);
+            if (result.success) {
+              Alert.alert('Éxito', 'Infracción marcada como pagada');
+              cargarInfracciones();
+            } else {
+              Alert.alert('Error', result.message || 'No se pudo actualizar');
+            }
+          },
+        },
+        {
+          text: 'Cancelar Infracción',
+          style: 'destructive',
+          onPress: async () => {
+            const result = await FinesService.updateFineStatus(infraccion.id, 'cancelada', token);
+            if (result.success) {
+              Alert.alert('Éxito', 'Infracción cancelada');
+              cargarInfracciones();
+            } else {
+              Alert.alert('Error', result.message || 'No se pudo cancelar');
+            }
+          },
+        },
       ]
     );
   };
@@ -166,12 +249,32 @@ const InfraccionesScreen: React.FC = () => {
   };
 
   const renderInfractionsList = () => {
-    if (getCardColumns() === 1) {
-      // Layout de 1 columna con scroll
+    if (loading) {
       return (
-        <ScrollView 
+        <Container style={{ justifyContent: 'center', alignItems: 'center', flex: 1 }}>
+          <ActivityIndicator size="large" color={theme.colors.primary} />
+          <Text style={{ marginTop: 10, color: theme.colors.gray }}>
+            Cargando infracciones...
+          </Text>
+        </Container>
+      );
+    }
+
+    if (infraccionesFiltradas.length === 0) {
+      return (
+        <Container style={{ justifyContent: 'center', alignItems: 'center', flex: 1 }}>
+          <Text style={{ color: theme.colors.gray }}>
+            No hay infracciones {filtroActivo !== 'todas' ? filtroActivo + 's' : ''}
+          </Text>
+        </Container>
+      );
+    }
+
+    if (getCardColumns() === 1) {
+      return (
+        <ScrollView
           showsVerticalScrollIndicator={true}
-          contentContainerStyle={{ 
+          contentContainerStyle={{
             flexGrow: 1,
             paddingBottom: getDynamicSpacing(40)
           }}
@@ -188,11 +291,10 @@ const InfraccionesScreen: React.FC = () => {
         </ScrollView>
       );
     } else {
-      // Layout de múltiples columnas  
       return (
-        <ScrollView 
+        <ScrollView
           showsVerticalScrollIndicator={true}
-          contentContainerStyle={{ 
+          contentContainerStyle={{
             flexGrow: 1,
             paddingBottom: getDynamicSpacing(40)
           }}
@@ -233,7 +335,7 @@ const InfraccionesScreen: React.FC = () => {
           count={infraccionesFiltradas.length}
           subtitle="Gestiona el estado y seguimiento"
         />
-        
+
         <CardsContainer>
           {renderInfractionsList()}
         </CardsContainer>
@@ -247,7 +349,6 @@ const InfraccionesScreen: React.FC = () => {
         onCreate={handleCrearInfraccion}
       />
 
-      {/* Botón flotante para crear nueva infracción */}
       <FloatingButton onPress={() => setShowModal(true)}>
         <FloatingButtonIcon>
           <Ionicons name="add" size={getDynamicSpacing(28)} color={theme.colors.white} />
