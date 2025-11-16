@@ -3,7 +3,7 @@ import NavegadorTabs from "./NavegadorTabs";
 import PantallaEstacionamientoActivo from "../pantallas/Estacionamiento/EstacionamientoActivo";
 import InfraccionesPendientes from "../pantallas/perfilUser/infraccionesPendientes";
 import NotificationsScreen from "../pantallas/perfilUser/NotificationsScreen";
-import Configuracion from "../pantallas/perfilUser/configuracion";
+import Configuracion from "../pantallas/perfilUser/Configuracion";
 import EditarPerfil from "../pantallas/perfilUser/EditarPerfil";
 import EliminarCuenta from "../pantallas/perfilUser/EliminarCuenta";
 

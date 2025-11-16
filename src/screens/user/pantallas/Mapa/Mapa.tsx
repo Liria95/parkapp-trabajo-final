@@ -1,4 +1,4 @@
-import React, { useContext } from "react";
+import { useContext, useState, useEffect, useRef } from "react";
 import { View, Text, StyleSheet, Image, TouchableOpacity } from "react-native";
 import TarjetaGradiente from "../../componentes/TarjetaGradiente";
 import BotonPrimSec from "../../componentes/Boton";
@@ -6,6 +6,8 @@ import { theme } from "../../../../config/theme";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
 import { UsuarioContext } from "../../contexto/UsuarioContext";
+import MapView, { Marker } from 'react-native-maps';
+import * as Location from 'expo-location';
 
 export default function Mapa() {
   const context = useContext(UsuarioContext);
@@ -16,7 +18,89 @@ export default function Mapa() {
     estacionamiento,
     configEstacionamiento,
     actualizarSaldoEstacionamiento,
+    setParkingLocationAddress, 
   } = context;
+
+  //rferencia para controlar el MapView (para animación)
+  const mapRef = useRef(null);
+
+  //definición de tipos
+  type locationType = {
+  latitude: number,
+  longitude: number,
+  latitudeDelta: number,
+  longitudeDelta: number,
+};
+
+  const [region, setRegion] = useState({
+    //región por defecto CABA
+    latitude: -34.6067,
+    longitude: -58.33816,
+    latitudeDelta: 0.05, // zoom inicial 
+    longitudeDelta: 0.05,
+  });
+
+  const [userLocation, setUserLocation] = useState<locationType>();
+  const [currentAddress, setCurrentAddress] = useState("Obteniendo dirección...");
+
+
+  //Traduce coordenadas a dirección 
+  const fetchAddressFromCoords = async (latitude: number, longitude: number) => {
+    try {
+      const addressArray = await Location.reverseGeocodeAsync({ latitude, longitude });
+    
+      if (addressArray.length > 0) {
+        const addr = addressArray[0];
+        //dirección legible con calle, número (si existe) y ciudad/país
+        const formattedAddress = `${addr.street} ${addr.streetNumber || ''}, ${addr.city}, ${addr.country}`;
+        setCurrentAddress(formattedAddress);
+
+        if (setParkingLocationAddress) {
+            setParkingLocationAddress(formattedAddress);
+        }
+        
+      } else {
+        setCurrentAddress("Dirección no encontrada.");
+      }
+    } catch (error) {
+      console.error("Error al obtener la dirección:", error);
+      setCurrentAddress("Error de servicio de Geocodificación.");
+    }
+  };
+
+  useEffect(() => {
+    const fetchLocation = async () => {
+      let {status} = await Location.requestForegroundPermissionsAsync();
+
+      if (status !== 'granted') {
+        console.error('El permiso para acceder a la ubicación fue denegada.')
+        return;
+      }
+
+      try {
+        let location = await Location.getCurrentPositionAsync({
+          accuracy: Location.Accuracy.High,
+        });
+
+        const newRegion = {
+          latitude: location.coords.latitude,
+          longitude: location.coords.longitude,
+          latitudeDelta: 0.005, // mayor zoom para centrar al usuario
+          longitudeDelta: 0.005,
+        };
+
+        setUserLocation(newRegion);
+        setRegion(newRegion); //centrar el mapa en la nueva ubicación
+
+        fetchAddressFromCoords(location.coords.latitude, location.coords.longitude);
+
+      } catch (error) {
+        console.error("Error al obtener la ubicación:", error);
+      }
+    };
+
+    fetchLocation();
+  }, []);
 
   let saldoRestante = saldo;
 
@@ -60,14 +144,44 @@ export default function Mapa() {
           colors={[theme.colors.secondary, theme.colors.success]}
           style={styles.contCardMapa}
         >
-          <Image
-            source={require("../../../../assets/map.png")}
-            style={styles.imagenMapa}
-            resizeMode="cover"
-          />
-          <Text style={styles.textoTarjetaTitulo}>MAPA INTERACTIVO</Text>
+          <MapView 
+            style={styles.mapa} 
+            region={region}
+            onRegionChangeComplete={setRegion} //actualiza region al arrastrar el mapa
+            showsUserLocation={true} // muestra el punto azul de ubicación
+            showsMyLocationButton={true} // Muestra el botón de centrar en la ubicación
+            toolbarEnabled={false}
+            >
+              
+              {userLocation && (
+                <Marker coordinate = {{
+                  latitude:region.latitude,
+                  longitude: region.longitude
+                }}
+                title="Estás Aquí"
+                description="Tu ubicación actual"
+                pinColor={theme.colors.primary}
+
+                />
+              )}  
+
+              { /*{
+                <Marker coordinate=
+                  {{
+                    latitude:-31.8500,
+                    longitude:-59.0167 
+                  }}
+                  title="Villaguay"
+                  description="Tu ubicación actual"
+                  pinColor={theme.colors.primary}
+                />
+              }  */}
+
+          </MapView>
+
+          <Text style={styles.textoTarjetaTitulo}>Ubicación</Text>
           <Text style={styles.textoMapaSimulado}>
-            Estacionamientos libres en la zona
+            {currentAddress}
           </Text>
         </LinearGradient>
 
@@ -108,8 +222,9 @@ const styles = StyleSheet.create({
     height: "50%",
     alignItems: "center",
     borderRadius: 15,
+    overflow:'hidden',
   },
-  imagenMapa: {
+  mapa: {
     width: "100%",
     height: 200,
     borderRadius: 10,

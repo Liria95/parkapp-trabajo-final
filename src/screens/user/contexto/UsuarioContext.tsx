@@ -40,6 +40,9 @@ type UsuarioContextType = {
   }>>;
   actualizarSaldoEstacionamiento: () => void;
   limpiarDatos: () => void;
+
+  parkingLocationAddress: string | null;
+  setParkingLocationAddress: React.Dispatch<React.SetStateAction<string | null>>;
 };
 
 export const UsuarioContext = createContext<UsuarioContextType | undefined>(undefined);
@@ -61,6 +64,8 @@ export const UsuarioProvider = ({ children }: UsuarioProviderProps) => {
     tarifaHora: 120,
     limite: 2,
   });
+
+  const [parkingLocationAddress, setParkingLocationAddress] = useState<string | null>(null);
 
   // Cargar estacionamiento al iniciar
   useEffect(() => {
@@ -201,7 +206,8 @@ export const UsuarioProvider = ({ children }: UsuarioProviderProps) => {
     setMovimientos([]);
     setPatente("");
     setEstacionamiento(null);
-    
+    setParkingLocationAddress(null);
+
     // Limpiar AsyncStorage
     AsyncStorage.removeItem('estacionamientoActivo').catch(error => {
       console.error('Error al limpiar AsyncStorage:', error);
@@ -224,6 +230,8 @@ export const UsuarioProvider = ({ children }: UsuarioProviderProps) => {
         actualizarConfigEstacionamiento: setConfigEstacionamiento,
         actualizarSaldoEstacionamiento,
         limpiarDatos,
+        parkingLocationAddress,
+        setParkingLocationAddress,
       }}
     >
       {children}

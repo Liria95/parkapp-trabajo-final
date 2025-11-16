@@ -1,7 +1,7 @@
 // Configuración de la API
 export const API_CONFIG = {
   // Cambiar esta IP por la de tu computadora
-  BASE_URL: 'http://192.168.1.7:3000',
+  BASE_URL: 'http://192.168.1.2:3000',
   
   // Endpoints
   ENDPOINTS: {

@@ -23,11 +23,15 @@ export default function RegistrarVehiculo() {
     setPatente,
     iniciarEstacionamiento,
     configEstacionamiento,
+    parkingLocationAddress,
   } = usuarioContext;
 
   const { state } = authContext;
 
-  const ubicacion = configEstacionamiento?.ubicacion || "AVENIDA SAN MARTIN 583, CIUDAD DE MENDOZA";
+  const ubicacion = parkingLocationAddress 
+    || configEstacionamiento?.ubicacion 
+    || "AVENIDA SAN MARTIN 583, CIUDAD DE MENDOZA (Ubicación por defecto)";
+
   const tarifaHora = configEstacionamiento?.tarifaHora || 100;
   const limite = configEstacionamiento?.limite || 2;
 
@@ -39,7 +43,7 @@ export default function RegistrarVehiculo() {
     console.log('===== REGISTRAR VEHÍCULO =====');
     console.log('👤 User ID:', state.user?.id);
     console.log('Config Estacionamiento:', configEstacionamiento);
-    console.log('Ubicación:', ubicacion);
+    console.log('Ubicación:', ubicacion); 
     console.log('Tarifa:', tarifaHora);
     console.log('Límite:', limite);
     console.log('Saldo:', saldo);
@@ -69,6 +73,12 @@ export default function RegistrarVehiculo() {
   }
 
   const handleIniciar = async () => {
+
+    if (ubicacion.includes("Ubicación por defecto") || !ubicacion) {
+      Alert.alert("Error de Ubicación", "Aún no se pudo determinar tu ubicación actual desde el mapa. Por favor, espera unos segundos e inténtalo de nuevo.");
+      return;
+    }
+
     if (!patente || patente.trim() === "") {
       Alert.alert("Error", "Por favor ingresa una patente");
       return;
