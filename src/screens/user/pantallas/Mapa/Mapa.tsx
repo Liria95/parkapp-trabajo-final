@@ -165,18 +165,6 @@ export default function Mapa() {
                 />
               )}  
 
-              { /*{
-                <Marker coordinate=
-                  {{
-                    latitude:-31.8500,
-                    longitude:-59.0167 
-                  }}
-                  title="Villaguay"
-                  description="Tu ubicación actual"
-                  pinColor={theme.colors.primary}
-                />
-              }  */}
-
           </MapView>
 
           <Text style={styles.textoTarjetaTitulo}>Ubicación</Text>

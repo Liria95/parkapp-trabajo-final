@@ -10,12 +10,12 @@ import RegisterScreen from './src/screens/auth/RegisterScreen';
 
 // Importacion pantallas ADMIN
 import AdminDashboard from './src/screens/admin/AdminDashboard';
-import AdminDrawer from './src/screens/admin/AdminDrawer';
+import PerfilStack from './src/screens/admin/PerfilStack';
 import EspaciosScreen from './src/screens/admin/EspaciosScreen';
 import GestionUsuariosScreen from './src/screens/admin/GestionUsuariosScreen';
 import InfraccionesScreen from './src/screens/admin/InfraccionesScreen';
 import RegistroManualScreen from './src/screens/admin/RegistroManualScreen';
-import AdminPanel from './src/screens/admin/AdminPanel';
+import Historial from './src/screens/admin/Historial';
 
 // Importacion navegación de usuario
 import NavegadorPrincipalUsuario from './src/screens/user/navegacion/NavegadorPrincipal';
@@ -37,12 +37,12 @@ export type AuthStackParamList = {
 
 export type AdminStackParamList = {
   AdminDashboard: undefined;
-  AdminDrawer: undefined;
+  PerfilStack: undefined;
   Espacios: undefined;
   GestionUsuarios: undefined;
   Infracciones: undefined;
   RegistroManual: undefined;
-  AdminPanel: undefined;
+  Historial: undefined;
 };
 
 export type UserStackParamList = {
@@ -101,12 +101,12 @@ const AdminNavigator = () => (
       component={AdminDashboard}
       options={{ gestureEnabled: false }}
     />
-    <AdminStack.Screen name="AdminDrawer" component={AdminDrawer} />
+    <AdminStack.Screen name="PerfilStack" component={PerfilStack} />
     <AdminStack.Screen name="Espacios" component={EspaciosScreen} />
     <AdminStack.Screen name="GestionUsuarios" component={GestionUsuariosScreen} />
     <AdminStack.Screen name="Infracciones" component={InfraccionesScreen} />
     <AdminStack.Screen name="RegistroManual" component={RegistroManualScreen} />
-    <AdminStack.Screen name="AdminPanel" component={AdminPanel} />
+    <AdminStack.Screen name="Historial" component={Historial} />
   </AdminStack.Navigator>
 );
 

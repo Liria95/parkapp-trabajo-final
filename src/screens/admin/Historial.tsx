@@ -1,6 +1,6 @@
 import { theme } from '../../config/theme';
 import { StyleSheet, View, Text, TouchableOpacity, Alert, FlatList, ActivityIndicator } from "react-native";
-import { DrawerActions, useNavigation } from '@react-navigation/native';
+import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useContext, useEffect, useState } from 'react';
 import styled from 'styled-components/native';
@@ -8,9 +8,8 @@ import { getDynamicSpacing, getResponsiveSize } from '../../utils/ResponsiveUtil
 
 // Componentes reutilizables
 import { Container } from '../../components/shared/StyledComponents';
-import AppHeader from '../../components/common/AppHeader';
 import StatsGrid from '../../components/dashboard/StatsGrid';
-import InfoCard from '../../components/adminpanel/InfoCard';
+import InfoCard from '../../components/historial/InfoCard';
 import { AUTH_ACTIONS, AuthContext } from '../../components/shared/Context/AuthContext/AuthContext';
 
 // Servicios
@@ -20,34 +19,11 @@ import { FinesService } from '../../services/FinesService';
 // navegación
 type RootStackParamList = {
   AdminDashboard: undefined;
-  AdminPanel: undefined;
+  Historial: undefined;
 };
 
-type AdminPanelNavigationProp = NativeStackNavigationProp<RootStackParamList, 'AdminPanel'>;
+type HistorialNavigationProp = NativeStackNavigationProp<RootStackParamList, 'Historial'>;
 
-// Styled components
-const Section = styled.View`
-  margin-bottom: ${getDynamicSpacing(20)}px;
-`;
-
-const SectionTitle = styled.Text`
-  text-align: center;
-  font-size: ${getResponsiveSize(18)}px;
-  font-weight: bold;
-  color: ${theme.colors.dark};
-  margin-bottom: ${getDynamicSpacing(10)}px;
-`;
-
-const UserRow = styled.View`
-  padding: ${getDynamicSpacing(10)}px;
-  border-bottom-width: 1px;
-  border-color: ${theme.colors.lightGray};
-`;
-
-const UserText = styled.Text`
-  font-size: ${getResponsiveSize(14)}px;
-  color: ${theme.colors.dark};
-`;
 
 interface User {
   id: string;
@@ -69,8 +45,8 @@ interface Stats {
   pendingFines?: number;
 }
 
-export default function AdminPanel() {
-  const navigation = useNavigation<AdminPanelNavigationProp>();
+export default function Historial() {
+  const navigation = useNavigation<HistorialNavigationProp>();
   const authContext = useContext(AuthContext);
 
   const [usuarios, setUsuarios] = useState<User[]>([]);
@@ -211,6 +187,18 @@ export default function AdminPanel() {
     },
   ];
 
+
+  //determina color de la infocard
+  const getCardColor = (label: string) => {
+    //Ocupación primary color
+    if (label.includes('Ocupación')){
+      return theme.colors.primary;
+    }
+    //Ingresos warning color
+    if (label.includes('Ingresos')){
+      return theme.colors.warning;
+    }
+  }  
   // Configuración de StatsGrid con datos reales (usando las mismas labels originales)
   const statsConfig = stats ? [
     {
@@ -275,8 +263,8 @@ export default function AdminPanel() {
       {stats && <StatsGrid stats={statsConfig} />}
 
       {/* Histórico de días anteriores */}
-      <Section>
-        <SectionTitle>Histórico reciente</SectionTitle>
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Historial</Text>
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center' }}>
           {historyStats.map((item) => (
             <InfoCard
@@ -284,13 +272,13 @@ export default function AdminPanel() {
               label={item.label}
               value={item.value}
               trend={item.trend}
-              backgroundColor={theme.colors.lightGray}
+              backgroundColor={getCardColor(item.label)}
             />
           ))}
         </View>
-      </Section>
+      </View>
 
-      <SectionTitle>Usuarios HOY</SectionTitle>
+      <Text style={styles.sectionTitle}>Usuarios HOY</Text>
       
       {usuarios.length === 0 ? (
         <View style={{ padding: 20, alignItems: 'center' }}>
@@ -307,10 +295,12 @@ export default function AdminPanel() {
             <TouchableOpacity
               style={styles.userCard}
               onPress={() => handleUsuarioPress(item)}
-            >
+              >
+
               <View style={[styles.userAvatar, { backgroundColor: getUserColor(item.estado) }]}>
                 <Text style={styles.userAvatarText}>{item.nombre[0]}</Text>
               </View>
+
               <View style={styles.userInfo}>
                 <Text style={styles.userName}>{item.nombre}</Text>
                 <Text style={styles.userDetails}>
@@ -326,6 +316,17 @@ export default function AdminPanel() {
 }
 
 const styles = StyleSheet.create({
+  section:{
+    marginBottom: getDynamicSpacing(20),
+  },
+  sectionTitle:{
+    textAlign: 'center',
+    fontSize: getResponsiveSize(18),
+    fontWeight: 'bold',
+    color: theme.colors.dark,
+    marginBottom: getDynamicSpacing(10),
+    marginTop: 15
+  },
   userCard: {
     flexDirection: 'row',
     alignItems: 'center',

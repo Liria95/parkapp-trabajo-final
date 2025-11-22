@@ -65,6 +65,7 @@ export const UsuarioProvider = ({ children }: UsuarioProviderProps) => {
     limite: 2,
   });
 
+  
   const [parkingLocationAddress, setParkingLocationAddress] = useState<string | null>(null);
 
   // Cargar estacionamiento al iniciar

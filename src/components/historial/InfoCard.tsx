@@ -36,13 +36,13 @@ const styles = StyleSheet.create({
   label: {
     fontSize: 14,
     fontWeight: '600',
-    color: theme.colors.gray,
+    color: theme.colors.white,
     marginBottom: 6,
   },
   value: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: theme.colors.dark,
+    color: theme.colors.white,
   },
   trend: {
     marginTop: 4,
