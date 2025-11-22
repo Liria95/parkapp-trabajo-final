@@ -16,6 +16,7 @@ import BottomTabNavigation from '../../components/navigation/BottomTabNavigation
 // Servicios
 import { AdminUserService } from '../../services/AdminUserService';
 import { FinesService } from '../../services/FinesService';
+import { ParkingSpacesService, ParkingSession } from '../../services/ParkingSpacesService';
 import { AuthContext } from '../../components/shared/Context/AuthContext/AuthContext';
 
 // Theme
@@ -44,6 +45,7 @@ interface ActiveUser {
 interface DashboardStats {
   occupiedSpaces: number;
   freeSpaces: number;
+  totalSpaces: number;
   todayIncome: string;
   violations: number;
 }
@@ -67,12 +69,14 @@ const AdminDashboard: React.FC = () => {
 
   const [stats, setStats] = useState<DashboardStats>({
     occupiedSpaces: 0,
-    freeSpaces: 200,
+    freeSpaces: 0,
+    totalSpaces: 0,
     todayIncome: '0',
     violations: 0,
   });
 
   const [activeUsers, setActiveUsers] = useState<ActiveUser[]>([]);
+  const [activeSessions, setActiveSessions] = useState<ParkingSession[]>([]);
 
   useFocusEffect(
     React.useCallback(() => {
@@ -94,57 +98,80 @@ const AdminDashboard: React.FC = () => {
       setLoading(true);
       console.log('Cargando datos del dashboard admin...');
 
-      // Cargar usuarios primero
+      let espaciosLibres = 0;
+      let espaciosOcupados = 0;
+      let espaciosTotales = 0;
+
+      try {
+        const spacesResult = await ParkingSpacesService.getSpacesStats(token);
+        console.log('Estadísticas de espacios:', spacesResult);
+
+        if (spacesResult.success && spacesResult.stats) {
+          espaciosLibres = spacesResult.stats.available || 0;
+          espaciosOcupados = spacesResult.stats.occupied || 0;
+          espaciosTotales = spacesResult.stats.total || 0;
+
+          if (spacesResult.activeSessions) {
+            setActiveSessions(spacesResult.activeSessions);
+          }
+        }
+      } catch (error) {
+        console.error('Error al cargar espacios:', error);
+      }
+
       const usuariosResult = await AdminUserService.getAllUsers(token);
 
-      // Procesar usuarios
       if (usuariosResult.success && usuariosResult.users) {
-        // Formatear usuarios activos para la lista
         const usuariosActivos = usuariosResult.users
           .filter(user => user.estado === 'activo')
-          .slice(0, 5) // Solo mostrar los primeros 5
+          .slice(0, 5)
           .map(user => ({
             id: user.id,
             name: user.nombreCompleto,
-            plate: 'N/A', //Obtener de vehículos
+            plate: 'N/A',
             balance: user.balance,
             status: user.estado as 'active' | 'inactive',
           }));
 
         setActiveUsers(usuariosActivos);
-
-        // Cargar ingresos REALES del día (solo recargas)
-        let ingresosHoy = 0;
-        try {
-          const incomeResult = await AdminUserService.getTodayIncome(token);
-          if (incomeResult.success && incomeResult.income) {
-            ingresosHoy = parseFloat(incomeResult.income);
-          }
-        } catch (error) {
-          console.warn('No se pudieron cargar los ingresos del día:', error);
-          ingresosHoy = 0;
-        }
-
-        // Intentar cargar multas
-        let multasPendientes = 0;
-        try {
-          const finesResult = await FinesService.getAllFines(token);
-          if (finesResult.success && finesResult.fines) {
-            multasPendientes = finesResult.fines.filter(f => f.estado === 'pendiente').length;
-          }
-        } catch (finesError) {
-          console.warn('No se pudieron cargar las infracciones (endpoint no disponible):', finesError);
-          // Continuar sin las infracciones
-        }
-
-        // Actualizar estadísticas
-        setStats({
-          occupiedSpaces: usuariosResult.users.filter(u => u.estado === 'activo').length,
-          freeSpaces: 200 - usuariosResult.users.filter(u => u.estado === 'activo').length,
-          todayIncome: ingresosHoy.toFixed(2),
-          violations: multasPendientes,
-        });
       }
+
+      let ingresosHoy = 0;
+      try {
+        const incomeResult = await AdminUserService.getTodayIncome(token);
+        if (incomeResult.success && incomeResult.income) {
+          ingresosHoy = parseFloat(incomeResult.income);
+        }
+      } catch (error) {
+        console.warn('No se pudieron cargar los ingresos del día:', error);
+        ingresosHoy = 0;
+      }
+
+      let multasPendientes = 0;
+      try {
+        const finesResult = await FinesService.getAllFines(token);
+        if (finesResult.success && finesResult.fines) {
+          multasPendientes = finesResult.fines.filter(f => f.estado === 'pendiente').length;
+        }
+      } catch (finesError) {
+        console.warn('No se pudieron cargar las infracciones:', finesError);
+      }
+
+      setStats({
+        occupiedSpaces: espaciosOcupados,
+        freeSpaces: espaciosLibres,
+        totalSpaces: espaciosTotales,
+        todayIncome: ingresosHoy.toFixed(2),
+        violations: multasPendientes,
+      });
+
+      console.log('Estadísticas actualizadas:', {
+        espaciosLibres,
+        espaciosOcupados,
+        espaciosTotales,
+        ingresosHoy,
+        multasPendientes
+      });
 
     } catch (error) {
       console.error('Error al cargar datos:', error);
@@ -154,19 +181,78 @@ const AdminDashboard: React.FC = () => {
     }
   };
 
-  // Configuración de estadísticas
+  const handleVerEspaciosOcupados = () => {
+    if (activeSessions.length === 0) {
+      Alert.alert('Sin espacios ocupados', 'No hay espacios ocupados en este momento');
+      return;
+    }
+
+    const mensaje = activeSessions.map((session, index) => {
+      const startTime = new Date(session.startTime);
+      const elapsed = Math.floor((Date.now() - startTime.getTime()) / (1000 * 60));
+      const tipo = session.isVisitor ? 'Visitante' : 'Usuario';
+
+      const codigo = session.spaceCode || session.spaceNumber || 'N/A';
+      const ubicacion = session.streetAddress || session.location || 'No especificada';
+      const tarifa = session.feePerHour || session.rate || 0;
+
+      return `${index + 1}. ${codigo}\n` +
+             `   Patente: ${session.licensePlate}\n` +
+             `   Tipo: ${tipo}\n` +
+             `   Ubicación: ${ubicacion}\n` +
+             `   Tiempo: ${elapsed} min\n` +
+             `   Tarifa: $${tarifa}/h`;
+    }).join('\n\n');
+
+    Alert.alert(
+      `Espacios Ocupados (${activeSessions.length})`,
+      mensaje,
+      [
+        { text: 'Cerrar', style: 'cancel' },
+        {
+          text: 'Ir a Espacios',
+          onPress: () => navigation.navigate('Espacios')
+        }
+      ],
+      { cancelable: true }
+    );
+  };
+
+  const handleVerEspaciosLibres = () => {
+    const mensaje =
+      `Espacios disponibles: ${stats.freeSpaces}\n` +
+      `Total de espacios: ${stats.totalSpaces}\n\n` +
+      `Estos espacios están listos para ser ocupados por los usuarios.`;
+
+    Alert.alert(
+      'Espacios Libres',
+      mensaje,
+      [
+        { text: 'Cerrar', style: 'cancel' },
+        {
+          text: 'Ver Todos los Espacios',
+          onPress: () => navigation.navigate('Espacios')
+        }
+      ]
+    );
+  };
+
   const statsConfig = [
     {
       id: 'occupied',
       number: stats.occupiedSpaces,
       label: 'Espacios\nOcupados',
       backgroundColor: theme.colors.primary,
+      buttonText: 'VER',
+      onPress: handleVerEspaciosOcupados,
     },
     {
       id: 'free',
       number: stats.freeSpaces,
       label: 'Espacios\nLibres',
       backgroundColor: theme.colors.success,
+      buttonText: 'VER',
+      onPress: handleVerEspaciosLibres,
     },
     {
       id: 'income',
@@ -184,7 +270,6 @@ const AdminDashboard: React.FC = () => {
     },
   ];
 
-  // Configuración de navegación inferior
   const tabsConfig = [
     {
       id: 'dashboard',
@@ -214,7 +299,7 @@ const AdminDashboard: React.FC = () => {
 
   const handleUserAction = (userId: string) => {
     const user = activeUsers.find(u => u.id === userId);
-    
+
     if (!user) {
       Alert.alert('Error', 'Usuario no encontrado');
       return;

@@ -8,16 +8,17 @@ import { AuthContext } from "../../../../components/shared/Context/AuthContext/A
 import { NotificationService } from "../../../../services/NotificationService";
 import { PaymentService } from "../../../../services/PaymentService";
 import { BalanceService } from "../../../../services/BalanceService";
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import Ionicons from "@expo/vector-icons/Ionicons";
 
 export default function Saldo() {
   const usuarioContext = useContext(UsuarioContext);
   const authContext = useContext(AuthContext);
-  
+
   if (!usuarioContext) throw new Error("UsuarioContext debe estar dentro del UsuarioProvider");
   if (!authContext) throw new Error("AuthContext debe estar dentro del AuthProvider");
 
-  const { saldo, setSaldo, movimientos, agregarMovimiento } = usuarioContext;
+  const { saldo, setSaldo, movimientos, agregarMovimiento, sincronizarSaldoConServidor } = usuarioContext;
   const { state } = authContext;
 
   const [mostrarModalRecarga, setMostrarModalRecarga] = useState(false);
@@ -30,29 +31,24 @@ export default function Saldo() {
 
   const montosRapidos = [100, 500, 1000, 2000];
 
-  // Cargar saldo desde Firebase al montar el componente
   useEffect(() => {
     cargarSaldoDesdeServidor();
   }, []);
 
   const cargarSaldoDesdeServidor = async () => {
     const token = state.token;
-    
+
     if (!token) {
-      console.log('No hay token disponible');
       setCargandoSaldo(false);
       return;
     }
 
     try {
-      console.log('Cargando saldo desde Firebase...');
       const result = await BalanceService.getBalance(token);
-      
+
       if (result.success && result.balance !== undefined) {
-        console.log('Saldo cargado desde Firebase:', result.balance);
         setSaldo(result.balance);
-      } else {
-        console.error('Error al cargar saldo:', result.message);
+        await AsyncStorage.setItem('saldo', result.balance.toString());
       }
     } catch (error) {
       console.error('Error al cargar saldo:', error);
@@ -65,12 +61,7 @@ export default function Saldo() {
     const userId = state.user?.id;
     const userName = state.user?.name;
     const token = state.token;
-    
-    console.log('Verificando autenticación:');
-    console.log('  - userId:', userId);
-    console.log('  - userName:', userName);
-    console.log('  - token:', token ? 'Presente' : 'FALTANTE');
-    
+
     if (!userId || !userName || !token) {
       Alert.alert('Error', 'Sesión no válida. Inicia sesión nuevamente.');
       return;
@@ -78,7 +69,6 @@ export default function Saldo() {
 
     try {
       setProcesandoPago(true);
-      console.log('Procesando pago simulado...');
 
       const result = await PaymentService.simulatePayment(
         monto,
@@ -88,18 +78,18 @@ export default function Saldo() {
       );
 
       if (result.success) {
-        // Recargar saldo desde el servidor para asegurar sincronización
         await cargarSaldoDesdeServidor();
-        
         agregarMovimiento({ tipo: "Recarga", monto });
 
-        await NotificationService.notifyBalanceRecharged(userId, monto, saldo + monto);
+        const nuevoSaldo = saldo + monto;
+
+        await NotificationService.notifyBalanceRecharged(userId, monto, nuevoSaldo);
 
         setMostrarModalRecarga(false);
 
         Alert.alert(
           'Recarga exitosa',
-          `Se agregaron $${monto} a tu cuenta.\n\nNuevo saldo: $${(saldo + monto).toFixed(2)}`
+          `Se agregaron $${monto} a tu cuenta.\n\nNuevo saldo: $${nuevoSaldo.toFixed(2)}`
         );
       } else {
         Alert.alert('Error', result.message || 'No se pudo procesar');
@@ -123,20 +113,35 @@ export default function Saldo() {
     });
   };
 
+  const handleRefrescarSaldo = async () => {
+    setCargandoSaldo(true);
+    await sincronizarSaldoConServidor();
+    setCargandoSaldo(false);
+  };
+
   return (
     <View style={styles.contenedor}>
-      <Text style={styles.titulo}>MI SALDO</Text>
+      <View style={styles.header}>
+        <Text style={styles.titulo}>MI SALDO</Text>
+        <TouchableOpacity onPress={handleRefrescarSaldo} disabled={cargandoSaldo}>
+          <Ionicons 
+            name="refresh" 
+            size={24} 
+            color={cargandoSaldo ? theme.colors.gray : theme.colors.primary} 
+          />
+        </TouchableOpacity>
+      </View>
 
       <ScrollView 
         style={styles.scrollContainer}
         showsVerticalScrollIndicator={false}
       >
-        {/* Tarjeta de saldo actual */}
         <TarjetaGradiente 
           style={styles.tarjetaSaldo}
           colores={[theme.colors.secondary, theme.colors.success]}
         >
           <Text style={styles.tituloSaldo}>SALDO ACTUAL</Text>
+
           {cargandoSaldo ? (
             <Text style={styles.montoSaldo}>Cargando...</Text>
           ) : (
@@ -145,12 +150,11 @@ export default function Saldo() {
           
           {ultimoMovimiento && (
             <Text style={styles.ultimoMovimiento}>
-              ÚLTIMO MOVIMIENTO: {ultimoMovimiento.monto > 0 ? '+' : ''}${ultimoMovimiento.monto.toFixed(2)}
+              Último movimiento: {ultimoMovimiento.monto > 0 ? '+' : ''}${ultimoMovimiento.monto.toFixed(2)}
             </Text>
           )}
         </TarjetaGradiente>
 
-        {/* Botones de acción */}
         <View style={styles.botones}>
           <BotonPrimSec
             titulo="RECARGAR"
@@ -172,11 +176,10 @@ export default function Saldo() {
               minWidth: 120,
               marginTop: 20,
             }}
-            onPress={() => {/* Navegar a historial */}}
+            onPress={() => {}}
           />
         </View>
 
-        {/* Opciones */}
         <View style={styles.seccionOpciones}>
           <TouchableOpacity style={styles.opcion}>
             <Ionicons name="card-outline" size={24} color={theme.colors.dark} />
@@ -191,7 +194,6 @@ export default function Saldo() {
           </TouchableOpacity>
         </View>
 
-        {/* Últimos movimientos */}
         <View style={styles.seccionMovimientos}>
           <Text style={styles.subtitulo}>Últimos movimientos</Text>
           
@@ -228,7 +230,6 @@ export default function Saldo() {
         </View>
       </ScrollView>
 
-      {/* Modal de Recarga */}
       <Modal
         visible={mostrarModalRecarga}
         transparent
@@ -299,12 +300,16 @@ const styles = StyleSheet.create({
   scrollContainer: {
     flex: 1,
   },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
   titulo: {
     fontSize: 18,
     fontWeight: "900",
     color: theme.colors.primary,
-    marginBottom: 20,
-    textAlign: "center",
   },
   tarjetaSaldo: {
     padding: 30,

@@ -16,6 +16,7 @@ import { AUTH_ACTIONS, AuthContext } from '../../components/shared/Context/AuthC
 // Servicios
 import { AdminUserService } from '../../services/AdminUserService';
 import { FinesService } from '../../services/FinesService';
+import { ParkingSpacesService } from '../../services/ParkingSpacesService';
 
 // navegación
 type RootStackParamList = {
@@ -67,6 +68,10 @@ interface Stats {
   averageBalance: string;
   activeAdmins?: number;
   pendingFines?: number;
+  // Espacios desde parkingSessions
+  occupiedSpaces?: number;
+  freeSpaces?: number;
+  totalSpaces?: number;
 }
 
 export default function AdminPanel() {
@@ -103,12 +108,13 @@ export default function AdminPanel() {
       setLoading(true);
       console.log('Cargando datos del dashboard...');
 
-      // Cargar usuarios, estadísticas, multas e histórico en paralelo
-      const [usuariosResult, statsResult, finesResult, historyResult] = await Promise.all([
+      // ✅ Cargar usuarios, estadísticas, multas, histórico Y espacios en paralelo
+      const [usuariosResult, statsResult, finesResult, historyResult, spacesResult] = await Promise.all([
         AdminUserService.getAllUsers(token),
         AdminUserService.getStats(token),
         FinesService.getAllFines(token),
         AdminUserService.getHistoryStats(token),
+        ParkingSpacesService.getSpacesStats(token), 
       ]);
 
       if (usuariosResult.success && usuariosResult.users) {
@@ -147,10 +153,25 @@ export default function AdminPanel() {
         if (finesResult.success && finesResult.fines) {
           pendingFines = finesResult.fines.filter(f => f.estado === 'pendiente').length;
         }
+
+        // Obtener estadísticas de espacios desde parkingSessions
+        let occupiedSpaces = 0;
+        let freeSpaces = 0;
+        let totalSpaces = 0;
+
+        if (spacesResult.success && spacesResult.stats) {
+          occupiedSpaces = spacesResult.stats.occupied || 0;
+          freeSpaces = spacesResult.stats.available || 0;
+          totalSpaces = spacesResult.stats.total || 0;
+          console.log('Estadísticas de espacios:', spacesResult.stats);
+        }
         
         setStats({
           ...statsResult.stats,
-          pendingFines
+          pendingFines,
+          occupiedSpaces,  
+          freeSpaces,     
+          totalSpaces,    
         });
       }
 
@@ -211,11 +232,11 @@ export default function AdminPanel() {
     },
   ];
 
-  // Configuración de StatsGrid con datos reales (usando las mismas labels originales)
+  // Configuración de StatsGrid con OCUPACIÓN REAL de espacios
   const statsConfig = stats ? [
     {
       id: 'ocupacion',
-      number: stats.activeUsers, // Mostrar usuarios activos en lugar de ocupación
+      number: stats.occupiedSpaces || 0,  // ESPACIOS OCUPADOS (desde parkingSessions)
       label: 'Ocupación Actual',
       backgroundColor: theme.colors.primary,
     },
@@ -227,13 +248,13 @@ export default function AdminPanel() {
     },
     {
       id: 'multas',
-      number: stats.pendingFines || 0, // Multas pendientes reales desde Firebase
+      number: stats.pendingFines || 0,
       label: 'Multas Pendientes',
       backgroundColor: theme.colors.danger,
     },
     {
       id: 'admins',
-      number: stats.activeAdmins || 0, // Admins activos desde Firebase
+      number: stats.activeAdmins || 0,
       label: 'Admins Activos',
       backgroundColor: theme.colors.warning,
     },
@@ -243,7 +264,7 @@ export default function AdminPanel() {
     setUsuarioSeleccionado(usuario);
     Alert.alert(
       usuario.nombre,
-      `Email: ${usuario.email}\nSaldo: $${usuario.saldo}\nEstado: ${usuario.estado}\nÚltima actividad: ${usuario.ultimaActividad}`,
+      `Email: ${usuario.email}\nSaldo: $${usuario.saldo}\nEstado: ${usuario.estado}\nÚltima actividad: ${usuario.ultimaActividad}\nMultas pendientes: ${usuario.multasPendientes || 0}`,
       [
         { text: 'Cerrar', style: 'cancel' },
         { text: 'Ver más', onPress: () => console.log('Ver más detalles') }

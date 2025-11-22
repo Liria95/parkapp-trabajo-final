@@ -1,7 +1,9 @@
-import React, { useState } from 'react';
-import { Alert } from 'react-native';
+import React, { useState, useContext, useEffect } from 'react';
+import { Alert, ActivityIndicator, ScrollView, RefreshControl } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { useFocusEffect } from '@react-navigation/native';
+import styled from 'styled-components/native';
 
 // Componentes reutilizables
 import AppHeader from '../../components/common/AppHeader';
@@ -13,12 +15,13 @@ import EspacioCard from '../../components/cards/EspacioCard';
 import AppModal from '../../components/common/AppModal';
 import { Container } from '../../components/shared/StyledComponents';
 
-// Theme
-import { theme } from '../../config/theme' ;
-import { getResponsiveSize, getDynamicSpacing } from '../../utils/ResponsiveUtils';
+// Servicios
+import { ParkingSpacesService } from '../../services/ParkingSpacesService';
+import { AuthContext } from '../../components/shared/Context/AuthContext/AuthContext';
 
-// Styled components para el modal (SIN estilos inline)
-import styled from 'styled-components/native';
+// Theme
+import { theme } from '../../config/theme';
+import { getResponsiveSize, getDynamicSpacing } from '../../utils/ResponsiveUtils';
 
 const ModalSection = styled.View`
   margin-bottom: ${getDynamicSpacing(20)}px;
@@ -36,6 +39,19 @@ const ModalText = styled.Text`
   color: ${theme.colors.gray};
   margin-bottom: ${getDynamicSpacing(5)}px;
   line-height: ${getResponsiveSize(20)}px;
+`;
+
+const LoadingContainer = styled.View`
+  flex: 1;
+  justify-content: center;
+  align-items: center;
+  padding: ${getDynamicSpacing(40)}px;
+`;
+
+const LoadingText = styled.Text`
+  margin-top: ${getDynamicSpacing(10)}px;
+  color: ${theme.colors.gray};
+  font-size: ${getResponsiveSize(14)}px;
 `;
 
 // Tipos
@@ -68,118 +84,131 @@ interface Espacio {
 
 const EspaciosScreen: React.FC = () => {
   const navigation = useNavigation<EspaciosScreenNavigationProp>();
+  const authContext = useContext(AuthContext);
   
   const [filtroEstado, setFiltroEstado] = useState<string>('todos');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [showModal, setShowModal] = useState<boolean>(false);
   const [espacioSeleccionado, setEspacioSeleccionado] = useState<Espacio | null>(null);
+  const [espacios, setEspacios] = useState<Espacio[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [refreshing, setRefreshing] = useState<boolean>(false);
+  const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
 
-  // Mock data espacios
-  const [espacios] = useState<Espacio[]>([
-    {
-      id: '1',
-      numero: 'A-001',
-      ubicacion: 'AV. SAN MARTÍN 123',
-      estado: 'ocupado',
-      tarifaPorHora: 50,
-      vehiculoActual: {
-        patente: 'ABC123',
-        horaInicio: '14:30',
-        tiempoRestante: '1h 23m'
-      },
-      sensor: {
-        estado: 'activo',
-        ultimaActualizacion: 'Hace 2 min'
+  // ✅ Auto-refresh cada 5 segundos
+  useEffect(() => {
+    console.log('🔄 Iniciando auto-refresh cada 5 segundos...');
+    
+    const interval = setInterval(() => {
+      console.log('🔄 Auto-refrescando espacios...');
+      cargarEspacios(true); // true = es auto-refresh
+    }, 5000); // 5 segundos
+
+    return () => {
+      console.log('🛑 Deteniendo auto-refresh');
+      clearInterval(interval);
+    };
+  }, []);
+
+  // ✅ Cargar al entrar a la pantalla
+  useFocusEffect(
+    React.useCallback(() => {
+      console.log('👁️ Pantalla enfocada - Cargando espacios');
+      cargarEspacios();
+    }, [])
+  );
+
+  // Función para mapear estados del backend al frontend
+  const mapearEstado = (estado: string): 'libre' | 'ocupado' | 'mantenimiento' | 'reservado' => {
+    switch (estado) {
+      case 'available':
+        return 'libre';
+      case 'occupied':
+        return 'ocupado';
+      case 'maintenance':
+      case 'mantenimiento':
+        return 'mantenimiento';
+      case 'reserved':
+      case 'reservado':
+        return 'reservado';
+      default:
+        return 'libre';
+    }
+  };
+
+  // ✅ Función de carga mejorada
+  const cargarEspacios = async (isAutoRefresh: boolean = false) => {
+    const token = authContext?.state.token;
+
+    if (!token) {
+      if (!isAutoRefresh) {
+        Alert.alert('Error', 'No hay token de autenticación');
       }
-    },
-    {
-      id: '2',
-      numero: 'A-002',
-      ubicacion: 'AV. SAN MARTÍN 125',
-      estado: 'libre',
-      tarifaPorHora: 50,
-      sensor: {
-        estado: 'activo',
-        ultimaActualizacion: 'Hace 1 min'
+      setLoading(false);
+      return;
+    }
+
+    try {
+      // Solo mostrar loading en la primera carga (no en auto-refresh)
+      if (!isAutoRefresh && espacios.length === 0 && !refreshing) {
+        setLoading(true);
       }
-    },
-    {
-      id: '3',
-      numero: 'B-001',
-      ubicacion: 'AV. BELGRANO 456',
-      estado: 'mantenimiento',
-      tarifaPorHora: 75,
-      sensor: {
-        estado: 'error',
-        ultimaActualizacion: 'Hace 15 min'
+      
+      if (!isAutoRefresh) {
+        console.log('📍 Cargando espacios de estacionamiento...');
       }
-    },
-    {
-      id: '4',
-      numero: 'B-002',
-      ubicacion: 'AV. BELGRANO 458',
-      estado: 'reservado',
-      tarifaPorHora: 75,
-      sensor: {
-        estado: 'activo',
-        ultimaActualizacion: 'Hace 3 min'
+
+      const result = await ParkingSpacesService.getAllSpaces(token);
+
+      if (result.success && result.spaces) {
+        if (!isAutoRefresh) {
+          console.log('✅ Espacios cargados:', result.spaces.length);
+        }
+
+        // Transformar datos del backend al formato del frontend
+        const espaciosFormateados = result.spaces.map(space => ({
+          id: space.id,
+          numero: space.spaceCode,
+          ubicacion: space.streetAddress,
+          estado: mapearEstado(space.status),
+          tarifaPorHora: space.feePerHour,
+          sensor: {
+            estado: 'activo' as const,
+            ultimaActualizacion: 'Ahora'
+          }
+        }));
+
+        setEspacios(espaciosFormateados);
+        setLastUpdate(new Date());
+      } else {
+        if (!isAutoRefresh) {
+          console.log('❌ Error al cargar espacios:', result.message);
+          Alert.alert('Error', result.message || 'No se pudieron cargar los espacios');
+        }
       }
-    },
-    {
-      id: '5',
-      numero: 'C-001',
-      ubicacion: 'CALLE CORRIENTES 789',
-      estado: 'ocupado',
-      tarifaPorHora: 60,
-      vehiculoActual: {
-        patente: 'XYZ789',
-        horaInicio: '13:15',
-        tiempoRestante: '45m'
-      },
-      sensor: {
-        estado: 'activo',
-        ultimaActualizacion: 'Hace 1 min'
+    } catch (error) {
+      if (!isAutoRefresh) {
+        console.error('❌ Error al cargar espacios:', error);
+        Alert.alert('Error', 'Ocurrió un error al cargar los espacios');
       }
-    },
-    {
-      id: '6',
-      numero: 'C-002',
-      ubicacion: 'CALLE CORRIENTES 791',
-      estado: 'libre',
-      tarifaPorHora: 60,
-      sensor: {
-        estado: 'activo',
-        ultimaActualizacion: 'Hace 4 min'
-      }
-    },
-    {
-      id: '7',
-      numero: 'D-001',
-      ubicacion: 'AV. INDEPENDENCIA 567',
-      estado: 'libre',
-      tarifaPorHora: 45,
-      sensor: {
-        estado: 'activo',
-        ultimaActualizacion: 'Hace 2 min'
-      }
-    },
-    {
-      id: '8',
-      numero: 'D-002',
-      ubicacion: 'AV. INDEPENDENCIA 569',
-      estado: 'ocupado',
-      tarifaPorHora: 45,
-      vehiculoActual: {
-        patente: 'DEF456',
-        horaInicio: '15:00',
-        tiempoRestante: '2h 15m'
-      },
-      sensor: {
-        estado: 'activo',
-        ultimaActualizacion: 'Hace 1 min'
-      }
-    },
-  ]);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  };
+
+  // ✅ Función para formatear tiempo transcurrido
+  const getTimeSinceUpdate = (): string => {
+    const now = new Date();
+    const diffMs = now.getTime() - lastUpdate.getTime();
+    const diffSeconds = Math.floor(diffMs / 1000);
+    
+    if (diffSeconds < 10) return 'Ahora';
+    if (diffSeconds < 60) return `Hace ${diffSeconds}s`;
+    
+    const diffMinutes = Math.floor(diffSeconds / 60);
+    return `Hace ${diffMinutes}m`;
+  };
 
   // Estadísticas calculadas
   const stats = {
@@ -189,7 +218,7 @@ const EspaciosScreen: React.FC = () => {
     mantenimiento: espacios.filter(e => e.estado === 'mantenimiento').length,
   };
 
-  // Configuración de estadísticas unificada
+  // Configuración de estadísticas
   const statsConfig = [
     {
       id: 'libre',
@@ -274,46 +303,84 @@ const EspaciosScreen: React.FC = () => {
     );
   };
 
+  // ✅ Pantalla de carga inicial
+  if (loading) {
+    return (
+      <Container>
+        <AppHeader
+          title="Gestión de Espacios"
+          subtitle="Monitoreo en tiempo real"
+          onBackPress={() => navigation.goBack()}
+        />
+        <LoadingContainer>
+          <ActivityIndicator size="large" color={theme.colors.primary} />
+          <LoadingText>Cargando espacios...</LoadingText>
+        </LoadingContainer>
+      </Container>
+    );
+  }
+
   return (
     <Container>
       <AppHeader
         title="Gestión de Espacios"
-        subtitle="Monitoreo en tiempo real"
+        subtitle={`Actualizado ${getTimeSinceUpdate()}`}
         onBackPress={() => navigation.goBack()}
-        onRightPress={() => Alert.alert('Mapa', 'Abrir vista de mapa general')}
-        rightIconName="map"
+        onRightPress={() => {
+          console.log('🔄 Refresh manual');
+          setRefreshing(true);
+          cargarEspacios();
+        }}
+        rightIconName="refresh"
       />
 
-      <StatsGrid stats={statsConfig} />
-
-      <SearchBar
-        value={searchQuery}
-        onChangeText={setSearchQuery}
-        placeholder="Buscar por número, ubicación o patente"
-      />
-
-      <FilterButtons
-        filters={filtros}
-        activeFilter={filtroEstado}
-        onFilterPress={setFiltroEstado}
-      />
-
-      <ResponsiveGrid>
-        {espaciosFiltrados.map(espacio => (
-          <EspacioCard
-            key={espacio.id}
-            espacio={espacio}
-            onPress={handleGestionarEspacio}
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={() => {
+              console.log('🔄 Pull to refresh');
+              setRefreshing(true);
+              cargarEspacios();
+            }}
+            colors={[theme.colors.primary]}
+            tintColor={theme.colors.primary}
+            title="Actualizando..."
+            titleColor={theme.colors.gray}
           />
-        ))}
-      </ResponsiveGrid>
+        }
+      >
+        <StatsGrid stats={statsConfig} />
+
+        <SearchBar
+          value={searchQuery}
+          onChangeText={setSearchQuery}
+          placeholder="Buscar por número, ubicación o patente"
+        />
+
+        <FilterButtons
+          filters={filtros}
+          activeFilter={filtroEstado}
+          onFilterPress={setFiltroEstado}
+        />
+
+        <ResponsiveGrid>
+          {espaciosFiltrados.map(espacio => (
+            <EspacioCard
+              key={espacio.id}
+              espacio={espacio}
+              onPress={handleGestionarEspacio}
+            />
+          ))}
+        </ResponsiveGrid>
+      </ScrollView>
 
       <AppModal
         visible={showModal}
         title={`Detalle - ${espacioSeleccionado?.numero}`}
         onClose={() => setShowModal(false)}
       >
-        {/* CORREGIDO: Sin estilos inline, usando styled components */}
         {espacioSeleccionado && (
           <>
             <ModalSection>

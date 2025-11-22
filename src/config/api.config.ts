@@ -1,26 +1,25 @@
-// Configuración de la API
 export const API_CONFIG = {
-  // Cambiar esta IP por la de tu computadora
-  BASE_URL: 'http://192.168.1.7:3000',
+  BASE_URL: 'http://192.168.1.6:3000',
   
-  // Endpoints
   ENDPOINTS: {
     PAYMENTS: '/api/payments',
     AUTH: '/api/auth',
     USERS: '/api/users',
     NOTIFICATIONS: '/api/notifications',
     FINES: '/api/fines',
+    MANUAL_REGISTRATION: '/api/manual-registration',
+    PARKING_SPACES: '/api/parking-spaces',
   },
   
-  // Timeout para peticiones (en milisegundos)
   TIMEOUT: 10000,
 };
 
-// URLs completas para usar directamente
 export const API_URLS = {
   PAYMENTS: `${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.PAYMENTS}`,
   AUTH: `${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.AUTH}`,
   USERS: `${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.USERS}`,
   NOTIFICATIONS: `${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.NOTIFICATIONS}`,
   FINES: `${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.FINES}`,
+  MANUAL_REGISTRATION: `${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.MANUAL_REGISTRATION}`,
+  PARKING_SPACES: `${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.PARKING_SPACES}`,
 };

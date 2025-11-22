@@ -1,4 +1,3 @@
-// src/services/BalanceService.ts
 import { API_URLS } from '../config/api.config';
 
 export class BalanceService {
@@ -9,7 +8,8 @@ export class BalanceService {
     try {
       console.log('Obteniendo saldo desde el servidor...');
       
-      const response = await fetch(`${API_URLS.PAYMENTS}/balance`, {
+      // Se usa API_URLS.USERS para obtener el balance
+      const response = await fetch(`${API_URLS.USERS}/balance`, {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${authToken}`,
@@ -48,6 +48,7 @@ export class BalanceService {
     try {
       console.log('Obteniendo transacciones desde el servidor...');
       
+      // Las transacciones permanecen en PAYMENTS
       const response = await fetch(`${API_URLS.PAYMENTS}/transactions`, {
         method: 'GET',
         headers: {
