@@ -1,4 +1,4 @@
-import React, { useContext, useState, useEffect } from "react";
+import React, { useContext, useState, useEffect, useRef } from "react";
 import { View, Text, StyleSheet, TextInput, Modal, Alert, ScrollView, TouchableOpacity, ActivityIndicator } from "react-native";
 import { useCameraPermissions, CameraView } from "expo-camera";
 import { useNavigation } from "@react-navigation/native";
@@ -13,6 +13,9 @@ import { AuthContext } from "../../../../components/shared/Context/AuthContext/A
 import { RutasStackParamList } from "../../tipos/RutasStack";
 import { ParkingSpacesService } from "../../../../services/ParkingSpacesService";
 import type { EspacioDisponible } from "../../../../services/ParkingSpacesService";
+
+// ⚠️ IMPORTANTE: Reemplaza con tu API Key de Google Cloud Vision
+const GOOGLE_CLOUD_VISION_API_KEY = 'AIzaSyBRR5F7SRy6uFMsVU9oXKlQT0A-KBbJqGY';
 
 export default function RegistrarVehiculo() {
   const usuarioContext = useContext(UsuarioContext);
@@ -42,11 +45,100 @@ export default function RegistrarVehiculo() {
     longitude: number;
   } | null>(null);
   
+  // Estados para OCR
+  const [isProcessing, setIsProcessing] = useState(false);
+  const cameraRef = useRef<CameraView>(null);
+  
   const navigation = useNavigation<NativeStackNavigationProp<RutasStackParamList>>();
 
   const ubicacion = espacioSeleccionado?.ubicacion || configEstacionamiento?.ubicacion || "Selecciona un espacio";
   const tarifaHora = espacioSeleccionado?.tarifaPorHora || configEstacionamiento?.tarifaHora || 100;
   const limite = configEstacionamiento?.limite || 2;
+
+  // Función para buscar patente en el texto
+  const findPatente = (text: string): string | null => {
+    const cleanText = text.toUpperCase();
+    
+    // Buscar formato viejo: AA 123 BB (7 caracteres)
+    const matchVieja = cleanText.match(/[A-Z]{2}\s?[0-9]{3}\s?[A-Z]{2}/);
+    if (matchVieja) {
+      return matchVieja[0].replace(/\s/g, '');
+    }
+    
+    // Buscar formato nuevo: AAA 123 (6 caracteres)
+    const matchNueva = cleanText.match(/[A-Z]{3}\s?[0-9]{3}/);
+    if (matchNueva) {
+      return matchNueva[0].replace(/\s/g, '');
+    }
+    
+    return null;
+  };
+
+  // Función para enviar imagen a Google Cloud Vision
+  const analyzeImage = async (base64Image: string): Promise<string> => {
+    try {
+      const response = await fetch(
+        `https://vision.googleapis.com/v1/images:annotate?key=${GOOGLE_CLOUD_VISION_API_KEY}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            requests: [
+              {
+                image: { content: base64Image },
+                features: [{ type: 'TEXT_DETECTION', maxResults: 1 }],
+              },
+            ],
+          }),
+        }
+      );
+
+      const data = await response.json();
+      
+      if (data.responses?.[0]?.fullTextAnnotation?.text) {
+        return data.responses[0].fullTextAnnotation.text;
+      } else if (data.responses?.[0]?.textAnnotations?.[0]?.description) {
+        return data.responses[0].textAnnotations[0].description;
+      }
+      
+      return '';
+    } catch (error) {
+      console.error('Error en OCR:', error);
+      throw error;
+    }
+  };
+
+  // Capturar foto y procesar OCR
+  const capturarYProcesar = async () => {
+    if (!cameraRef.current) return;
+
+    setIsProcessing(true);
+    try {
+      const photo = await cameraRef.current.takePictureAsync({
+        quality: 0.8,
+        base64: true,
+      });
+
+      if (photo?.base64) {
+        const text = await analyzeImage(photo.base64);
+        console.log('Texto detectado:', text);
+        
+        const patenteEncontrada = findPatente(text);
+        
+        if (patenteEncontrada) {
+          setPatente(patenteEncontrada);
+          Alert.alert('Patente detectada', patenteEncontrada);
+        } else {
+          Alert.alert('No detectada', 'No se encontró una patente válida. Ingresala manualmente.');
+        }
+      }
+    } catch (error) {
+      console.error('Error al procesar imagen:', error);
+      Alert.alert('Error', 'No se pudo procesar la imagen');
+    } finally {
+      setIsProcessing(false);
+    }
+  };
 
   useEffect(() => {
     console.log('===== REGISTRAR VEHICULO =====');
@@ -58,7 +150,6 @@ export default function RegistrarVehiculo() {
     console.log('================================');
   }, [state, espacioSeleccionado, ubicacion, tarifaHora, saldo]);
 
-  // Cargar espacios al montar el componente
   useEffect(() => {
     obtenerUbicacionYCargarEspacios();
   }, []);
@@ -82,7 +173,6 @@ export default function RegistrarVehiculo() {
         longitude: location.coords.longitude
       });
       
-      // Cargar espacios con la ubicación
       cargarEspaciosDisponibles({
         latitude: location.coords.latitude,
         longitude: location.coords.longitude
@@ -90,7 +180,6 @@ export default function RegistrarVehiculo() {
       
     } catch (error) {
       console.error('Error al obtener ubicacion:', error);
-      // Si falla GPS, cargar espacios sin filtro
       cargarEspaciosDisponibles();
     }
   };
@@ -106,40 +195,23 @@ export default function RegistrarVehiculo() {
         return;
       }
 
-      console.log('========================================');
-      console.log('CARGANDO ESPACIOS DISPONIBLES');
-      console.log('Token presente:', !!token);
-      console.log('Ubicacion:', location || 'Sin ubicacion');
-      console.log('========================================');
-      
-      // Llamar al servicio con ubicación si está disponible
       const response = await ParkingSpacesService.getAvailableSpacesForUser(
         token,
         location ? {
           latitude: location.latitude,
           longitude: location.longitude,
-          radius: 1000 // CAMBIADO A 1000km
+          radius: 1000
         } : undefined
       );
 
-      console.log('========================================');
-      console.log('RESPUESTA DEL SERVICIO:');
-      console.log('Success:', response.success);
-      console.log('Total espacios:', response.total);
-      console.log('Espacios array length:', response.espacios?.length);
-      console.log('Primer espacio:', response.espacios?.[0]);
-      console.log('========================================');
-
       if (response.success && response.espacios) {
-        console.log('✅ Espacios cargados correctamente:', response.espacios.length);
         setEspaciosDisponibles(response.espacios);
       } else {
-        console.log('❌ Error al cargar espacios:', response.message);
         Alert.alert('Error', response.message || 'No se pudieron cargar espacios');
         setEspaciosDisponibles([]);
       }
     } catch (error) {
-      console.error('❌ Error al cargar espacios:', error);
+      console.error('Error al cargar espacios:', error);
       Alert.alert('Error', 'Error al cargar espacios');
       setEspaciosDisponibles([]);
     } finally {
@@ -153,18 +225,11 @@ export default function RegistrarVehiculo() {
   };
 
   const handleSeleccionarEspacio = (espacio: EspacioDisponible) => {
-    console.log('✅ Espacio seleccionado:', espacio.numero, espacio.ubicacion);
     setEspacioSeleccionado(espacio);
     setMostrarModalEspacios(false);
   };
 
   const handleAbrirModal = () => {
-    console.log('========================================');
-    console.log('ABRIENDO MODAL DE ESPACIOS');
-    console.log('Espacios disponibles:', espaciosDisponibles.length);
-    console.log('Primer espacio:', espaciosDisponibles[0]);
-    console.log('Loading:', loadingEspacios);
-    console.log('========================================');
     setMostrarModalEspacios(true);
   };
 
@@ -209,7 +274,6 @@ export default function RegistrarVehiculo() {
 
     if (!userId) {
       Alert.alert("Error", "No se pudo obtener el ID del usuario");
-      console.error("User ID no disponible");
       return;
     }
 
@@ -227,16 +291,8 @@ export default function RegistrarVehiculo() {
     navigation.navigate("EstacionamientoActivo");
   };
 
-  // DEBUG: Renderizar contenido del modal
   const renderModalContent = () => {
-    console.log('========================================');
-    console.log('RENDERIZANDO CONTENIDO DEL MODAL');
-    console.log('Loading:', loadingEspacios);
-    console.log('Espacios length:', espaciosDisponibles.length);
-    console.log('========================================');
-
     if (loadingEspacios) {
-      console.log('→ Mostrando LOADING');
       return (
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={theme.colors.primary} />
@@ -246,7 +302,6 @@ export default function RegistrarVehiculo() {
     }
 
     if (espaciosDisponibles.length === 0) {
-      console.log('→ Mostrando EMPTY');
       return (
         <View style={styles.emptyContainer}>
           <Ionicons name="car-outline" size={64} color={theme.colors.gray} />
@@ -261,46 +316,42 @@ export default function RegistrarVehiculo() {
       );
     }
 
-    console.log('→ Mostrando LISTA de', espaciosDisponibles.length, 'espacios');
     return (
       <ScrollView 
         style={styles.listaEspacios}
         contentContainerStyle={{paddingBottom: 20}}
         showsVerticalScrollIndicator={true}
       >
-        {espaciosDisponibles.map((espacio, index) => {
-          console.log(`  Renderizando espacio ${index}:`, espacio.numero);
-          return (
-            <TouchableOpacity
-              key={espacio.id}
-              style={[
-                styles.espacioItem,
-                espacioSeleccionado?.id === espacio.id && styles.espacioSeleccionado
-              ]}
-              onPress={() => handleSeleccionarEspacio(espacio)}
-            >
-              <View style={styles.espacioInfo}>
-                <Text style={styles.espacioNumero}>{espacio.numero}</Text>
-                <Text style={styles.espacioUbicacion} numberOfLines={1}>
-                  {espacio.ubicacion}
-                </Text>
-                <View style={styles.espacioFooter}>
-                  <Text style={styles.espacioTarifa}>${espacio.tarifaPorHora}/hora</Text>
-                  {espacio.distancia !== undefined && (
-                    <Text style={styles.espacioDistancia}>
-                      {espacio.distancia < 1 
-                        ? `${(espacio.distancia * 1000).toFixed(0)}m` 
-                        : `${espacio.distancia.toFixed(1)}km`}
-                    </Text>
-                  )}
-                </View>
+        {espaciosDisponibles.map((espacio, index) => (
+          <TouchableOpacity
+            key={espacio.id}
+            style={[
+              styles.espacioItem,
+              espacioSeleccionado?.id === espacio.id && styles.espacioSeleccionado
+            ]}
+            onPress={() => handleSeleccionarEspacio(espacio)}
+          >
+            <View style={styles.espacioInfo}>
+              <Text style={styles.espacioNumero}>{espacio.numero}</Text>
+              <Text style={styles.espacioUbicacion} numberOfLines={1}>
+                {espacio.ubicacion}
+              </Text>
+              <View style={styles.espacioFooter}>
+                <Text style={styles.espacioTarifa}>${espacio.tarifaPorHora}/hora</Text>
+                {espacio.distancia !== undefined && (
+                  <Text style={styles.espacioDistancia}>
+                    {espacio.distancia < 1 
+                      ? `${(espacio.distancia * 1000).toFixed(0)}m` 
+                      : `${espacio.distancia.toFixed(1)}km`}
+                  </Text>
+                )}
               </View>
-              {espacioSeleccionado?.id === espacio.id && (
-                <Ionicons name="checkmark-circle" size={24} color={theme.colors.success} />
-              )}
-            </TouchableOpacity>
-          );
-        })}
+            </View>
+            {espacioSeleccionado?.id === espacio.id && (
+              <Ionicons name="checkmark-circle" size={24} color={theme.colors.success} />
+            )}
+          </TouchableOpacity>
+        ))}
       </ScrollView>
     );
   };
@@ -310,10 +361,30 @@ export default function RegistrarVehiculo() {
       <Text style={styles.titulo}>REGISTRAR VEHICULO</Text>
 
       <ScrollView style={styles.contenedorCards} showsVerticalScrollIndicator={false}>
-        <View style={styles.tarjetaCamara}>
-          <CameraView style={styles.camera} facing="back" />
-          <Text style={styles.textoCamara}>(Simulacion de camara - OCR pendiente)</Text>
-        </View>
+        {/* Cámara - toca para capturar */}
+        <TouchableOpacity 
+          style={styles.tarjetaCamara}
+          onPress={capturarYProcesar}
+          disabled={isProcessing}
+          activeOpacity={0.8}
+        >
+          <CameraView 
+            ref={cameraRef}
+            style={styles.camera} 
+            facing="back" 
+          />
+          
+          {/* Overlay de procesamiento */}
+          {isProcessing && (
+            <View style={styles.processingOverlay}>
+              <ActivityIndicator color="#fff" size="large" />
+            </View>
+          )}
+          
+          <Text style={styles.textoCamara}>
+            {isProcessing ? 'Procesando...' : 'Toca para escanear patente'}
+          </Text>
+        </TouchableOpacity>
 
         <View style={styles.inputContainer}>
           <Text style={styles.label}>Patente detectada:</Text>
@@ -380,10 +451,7 @@ export default function RegistrarVehiculo() {
                   </Text>
                 )}
               </View>
-              <TouchableOpacity onPress={() => {
-                console.log('Cerrando modal');
-                setMostrarModalEspacios(false);
-              }}>
+              <TouchableOpacity onPress={() => setMostrarModalEspacios(false)}>
                 <Ionicons name="close" size={28} color={theme.colors.dark} />
               </TouchableOpacity>
             </View>
@@ -457,10 +525,16 @@ const styles = StyleSheet.create({
     width: "100%",
     height: "100%",
   },
+  processingOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   textoCamara: {
     position: "absolute",
     bottom: 10,
-    fontSize: 14,
+    fontSize: 12,
     color: theme.colors.white,
     fontWeight: "bold",
     backgroundColor: "rgba(0,0,0,0.5)",
