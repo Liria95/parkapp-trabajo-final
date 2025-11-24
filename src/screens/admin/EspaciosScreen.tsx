@@ -17,6 +17,7 @@ import { Container } from '../../components/shared/StyledComponents';
 
 // Servicios
 import { ParkingSpacesService } from '../../services/ParkingSpacesService';
+import { ParkingSessionService } from '../../services/parkingSessionService';
 import { AuthContext } from '../../components/shared/Context/AuthContext/AuthContext';
 
 // Theme
@@ -75,6 +76,8 @@ interface Espacio {
     patente: string;
     horaInicio: string;
     tiempoRestante: string;
+    sessionId?: string;
+    userId?: string;
   };
   sensor: {
     estado: 'activo' | 'inactivo' | 'error';
@@ -94,15 +97,16 @@ const EspaciosScreen: React.FC = () => {
   const [loading, setLoading] = useState<boolean>(true);
   const [refreshing, setRefreshing] = useState<boolean>(false);
   const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
+  const [sesionesActivas, setSesionesActivas] = useState<Map<string, any>>(new Map());
 
-  // ✅ Auto-refresh cada 5 segundos
+  // Auto-refresh cada 5 segundos
   useEffect(() => {
     console.log('🔄 Iniciando auto-refresh cada 5 segundos...');
     
     const interval = setInterval(() => {
       console.log('🔄 Auto-refrescando espacios...');
-      cargarEspacios(true); // true = es auto-refresh
-    }, 5000); // 5 segundos
+      cargarEspacios(true);
+    }, 5000);
 
     return () => {
       console.log('🛑 Deteniendo auto-refresh');
@@ -110,7 +114,7 @@ const EspaciosScreen: React.FC = () => {
     };
   }, []);
 
-  // ✅ Cargar al entrar a la pantalla
+  // Cargar al entrar a la pantalla
   useFocusEffect(
     React.useCallback(() => {
       console.log('👁️ Pantalla enfocada - Cargando espacios');
@@ -118,7 +122,7 @@ const EspaciosScreen: React.FC = () => {
     }, [])
   );
 
-  // Función para mapear estados del backend al frontend
+  // Mapear estados del backend al frontend
   const mapearEstado = (estado: string): 'libre' | 'ocupado' | 'mantenimiento' | 'reservado' => {
     switch (estado) {
       case 'available':
@@ -136,7 +140,7 @@ const EspaciosScreen: React.FC = () => {
     }
   };
 
-  // ✅ Función de carga mejorada
+  // Cargar espacios y sesiones activas
   const cargarEspacios = async (isAutoRefresh: boolean = false) => {
     const token = authContext?.state.token;
 
@@ -149,7 +153,6 @@ const EspaciosScreen: React.FC = () => {
     }
 
     try {
-      // Solo mostrar loading en la primera carga (no en auto-refresh)
       if (!isAutoRefresh && espacios.length === 0 && !refreshing) {
         setLoading(true);
       }
@@ -158,32 +161,56 @@ const EspaciosScreen: React.FC = () => {
         console.log('📍 Cargando espacios de estacionamiento...');
       }
 
-      const result = await ParkingSpacesService.getAllSpaces(token);
+      // Cargar espacios
+      const resultEspacios = await ParkingSpacesService.getAllSpaces(token);
 
-      if (result.success && result.spaces) {
+      // Cargar sesiones activas
+      const resultStats = await ParkingSessionService.getStats(token);
+
+      if (resultEspacios.success && resultEspacios.spaces) {
         if (!isAutoRefresh) {
-          console.log('✅ Espacios cargados:', result.spaces.length);
+          console.log('✅ Espacios cargados:', resultEspacios.spaces.length);
         }
 
+        // Crear mapa de sesiones activas por spaceCode
+        const sesionesMap = new Map();
+        if (resultStats.success && resultStats.activeSessions) {
+          resultStats.activeSessions.forEach(session => {
+            sesionesMap.set(session.spaceCode, session);
+          });
+        }
+        setSesionesActivas(sesionesMap);
+
         // Transformar datos del backend al formato del frontend
-        const espaciosFormateados = result.spaces.map(space => ({
-          id: space.id,
-          numero: space.spaceCode,
-          ubicacion: space.streetAddress,
-          estado: mapearEstado(space.status),
-          tarifaPorHora: space.feePerHour,
-          sensor: {
-            estado: 'activo' as const,
-            ultimaActualizacion: 'Ahora'
-          }
-        }));
+        const espaciosFormateados = resultEspacios.spaces.map(space => {
+          const sesion = sesionesMap.get(space.spaceCode);
+          
+          return {
+            id: space.id,
+            numero: space.spaceCode,
+            ubicacion: space.streetAddress,
+            estado: mapearEstado(space.status),
+            tarifaPorHora: space.feePerHour,
+            vehiculoActual: sesion ? {
+              patente: sesion.licensePlate,
+              horaInicio: new Date(sesion.startTime).toLocaleTimeString('es-AR'),
+              tiempoRestante: calcularTiempoTranscurrido(sesion.startTime),
+              sessionId: sesion.id,
+              userId: sesion.userId
+            } : undefined,
+            sensor: {
+              estado: 'activo' as const,
+              ultimaActualizacion: 'Ahora'
+            }
+          };
+        });
 
         setEspacios(espaciosFormateados);
         setLastUpdate(new Date());
       } else {
         if (!isAutoRefresh) {
-          console.log('❌ Error al cargar espacios:', result.message);
-          Alert.alert('Error', result.message || 'No se pudieron cargar los espacios');
+          console.log('❌ Error al cargar espacios:', resultEspacios.message);
+          Alert.alert('Error', resultEspacios.message || 'No se pudieron cargar los espacios');
         }
       }
     } catch (error) {
@@ -197,7 +224,18 @@ const EspaciosScreen: React.FC = () => {
     }
   };
 
-  // ✅ Función para formatear tiempo transcurrido
+  // Calcular tiempo transcurrido
+  const calcularTiempoTranscurrido = (startTime: string): string => {
+    const start = new Date(startTime);
+    const now = new Date();
+    const diffMs = now.getTime() - start.getTime();
+    const diffMinutes = Math.floor(diffMs / 60000);
+    const hours = Math.floor(diffMinutes / 60);
+    const minutes = diffMinutes % 60;
+    return `${hours}h ${minutes}m`;
+  };
+
+  // Formatear tiempo desde última actualización
   const getTimeSinceUpdate = (): string => {
     const now = new Date();
     const diffMs = now.getTime() - lastUpdate.getTime();
@@ -208,6 +246,77 @@ const EspaciosScreen: React.FC = () => {
     
     const diffMinutes = Math.floor(diffSeconds / 60);
     return `Hace ${diffMinutes}m`;
+  };
+
+  // Actualizar estado del espacio
+  const actualizarEstadoEspacio = async (
+    espacioId: string,
+    nuevoEstado: 'available' | 'maintenance' | 'reserved'
+  ) => {
+    const token = authContext?.state.token;
+    if (!token) return;
+
+    try {
+      const result = await ParkingSpacesService.updateSpaceStatus(
+        espacioId,
+        nuevoEstado,
+        token
+      );
+
+      if (result.success) {
+        Alert.alert('Éxito', result.message || 'Estado actualizado');
+        cargarEspacios();
+      } else {
+        Alert.alert('Error', result.message || 'No se pudo actualizar el estado');
+      }
+    } catch (error) {
+      console.error('Error al actualizar estado:', error);
+      Alert.alert('Error', 'Ocurrió un error al actualizar el estado');
+    }
+  };
+
+  // Finalizar estacionamiento
+  const finalizarEstacionamiento = async (espacio: Espacio) => {
+    const token = authContext?.state.token;
+    if (!token) return;
+
+    if (!espacio.vehiculoActual?.sessionId) {
+      Alert.alert('Error', 'No se encontró la sesión activa');
+      return;
+    }
+
+    Alert.alert(
+      'Confirmar finalización',
+      `¿Finalizar estacionamiento de ${espacio.vehiculoActual.patente}?`,
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Finalizar',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              const result = await ParkingSessionService.endSession(
+                espacio.vehiculoActual!.sessionId!,
+                token
+              );
+
+              if (result.success) {
+                Alert.alert(
+                  'Estacionamiento finalizado',
+                  `Duración: ${Math.floor(result.duration! / 60)} min\nCosto: $${result.totalCost?.toFixed(2)}`,
+                  [{ text: 'OK', onPress: () => cargarEspacios() }]
+                );
+              } else {
+                Alert.alert('Error', result.message || 'No se pudo finalizar');
+              }
+            } catch (error) {
+              console.error('Error al finalizar:', error);
+              Alert.alert('Error', 'Ocurrió un error al finalizar');
+            }
+          }
+        }
+      ]
+    );
   };
 
   // Estadísticas calculadas
@@ -272,38 +381,78 @@ const EspaciosScreen: React.FC = () => {
   };
 
   const handleGestionarEspacio = (espacio: Espacio) => {
-    let opciones = ['Cancelar'];
+    let opciones: any[] = [];
     
     if (espacio.estado === 'ocupado') {
-      opciones = ['Cancelar', 'Finalizar Estacionamiento', 'Crear Infracción', 'Ver Detalles'];
+      opciones = [
+        {
+          text: 'Finalizar Estacionamiento',
+          onPress: () => finalizarEstacionamiento(espacio)
+        },
+        {
+          text: 'Crear Infracción',
+          onPress: () => navigation.navigate('Infracciones')
+        },
+        {
+          text: 'Ver Detalles',
+          onPress: () => handleVerDetalle(espacio)
+        },
+        { text: 'Cancelar', style: 'cancel' }
+      ];
     } else if (espacio.estado === 'libre') {
-      opciones = ['Cancelar', 'Registro Manual', 'Poner en Mantenimiento', 'Reservar', 'Ver Detalles'];
+      opciones = [
+        {
+          text: 'Registro Manual',
+          onPress: () => navigation.navigate('RegistroManual')
+        },
+        {
+          text: 'Poner en Mantenimiento',
+          onPress: () => actualizarEstadoEspacio(espacio.id, 'maintenance')
+        },
+        {
+          text: 'Reservar',
+          onPress: () => actualizarEstadoEspacio(espacio.id, 'reserved')
+        },
+        {
+          text: 'Ver Detalles',
+          onPress: () => handleVerDetalle(espacio)
+        },
+        { text: 'Cancelar', style: 'cancel' }
+      ];
     } else if (espacio.estado === 'mantenimiento') {
-      opciones = ['Cancelar', 'Activar Espacio', 'Ver Detalles'];
+      opciones = [
+        {
+          text: 'Activar Espacio',
+          onPress: () => actualizarEstadoEspacio(espacio.id, 'available')
+        },
+        {
+          text: 'Ver Detalles',
+          onPress: () => handleVerDetalle(espacio)
+        },
+        { text: 'Cancelar', style: 'cancel' }
+      ];
+    } else if (espacio.estado === 'reservado') {
+      opciones = [
+        {
+          text: 'Liberar Espacio',
+          onPress: () => actualizarEstadoEspacio(espacio.id, 'available')
+        },
+        {
+          text: 'Ver Detalles',
+          onPress: () => handleVerDetalle(espacio)
+        },
+        { text: 'Cancelar', style: 'cancel' }
+      ];
     }
 
     Alert.alert(
       `Espacio ${espacio.numero}`,
       `Ubicación: ${espacio.ubicacion}\nEstado: ${espacio.estado.toUpperCase()}`,
-      opciones.map(opcion => ({
-        text: opcion,
-        style: opcion === 'Cancelar' ? 'cancel' : 'default',
-        onPress: () => {
-          if (opcion !== 'Cancelar') {
-            if (opcion === 'Ver Detalles') {
-              handleVerDetalle(espacio);
-            } else if (opcion === 'Registro Manual') {
-              navigation.navigate('RegistroManual');
-            } else {
-              Alert.alert('Acción', `${opcion} para espacio ${espacio.numero}`);
-            }
-          }
-        }
-      }))
+      opciones
     );
   };
 
-  // ✅ Pantalla de carga inicial
+  // Pantalla de carga inicial
   if (loading) {
     return (
       <Container>
@@ -401,7 +550,7 @@ const EspaciosScreen: React.FC = () => {
                 <ModalSectionTitle>Vehículo Actual</ModalSectionTitle>
                 <ModalText>Patente: {espacioSeleccionado.vehiculoActual.patente}</ModalText>
                 <ModalText>Hora de inicio: {espacioSeleccionado.vehiculoActual.horaInicio}</ModalText>
-                <ModalText>Tiempo restante: {espacioSeleccionado.vehiculoActual.tiempoRestante}</ModalText>
+                <ModalText>Tiempo transcurrido: {espacioSeleccionado.vehiculoActual.tiempoRestante}</ModalText>
               </ModalSection>
             )}
           </>

@@ -13,6 +13,7 @@ export interface Fine {
   amount: number;
   status: 'pendiente' | 'pagada' | 'cancelada';
   location: string;
+  parkingSpaceId?: string;
   parkingSessionId?: string;
   issuedAt: string;
   paidAt?: string;
@@ -20,10 +21,10 @@ export interface Fine {
 }
 
 export interface FineForDisplay extends Fine {
-  patente: string; // Alias para compatibilidad
-  motivo: string;  // Alias para compatibilidad
-  monto: number;   // Alias para compatibilidad
-  fecha: string;   // Fecha formateada
+  patente: string;
+  motivo: string;
+  monto: number;
+  fecha: string;
   estado: 'pendiente' | 'pagada' | 'cancelada';
   ubicacion: string;
 }
@@ -145,6 +146,7 @@ export class FinesService {
       reason: string;
       amount: number;
       location: string;
+      parkingSpaceId?: string;
       parkingSessionId?: string;
     },
     authToken: string
@@ -175,48 +177,6 @@ export class FinesService {
         return {
           success: false,
           message: data.message || 'Error al crear infracción',
-        };
-      }
-    } catch (error: any) {
-      console.error('Error de conexión:', error);
-      return {
-        success: false,
-        message: 'Error de conexión',
-      };
-    }
-  }
-
-  /**
-   * Actualizar estado de infracción (solo admin)
-   */
-  static async updateFineStatus(
-    fineId: string,
-    status: 'pendiente' | 'pagada' | 'cancelada',
-    authToken: string
-  ): Promise<{ success: boolean; message?: string }> {
-    try {
-      console.log('Actualizando estado de infracción:', fineId, 'a', status);
-
-      const response = await fetch(`${API_URL}/${fineId}/status`, {
-        method: 'PUT',
-        headers: {
-          'Authorization': `Bearer ${authToken}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ status }),
-      });
-
-      const data = await response.json();
-
-      if (response.ok && data.success) {
-        return {
-          success: true,
-          message: data.message,
-        };
-      } else {
-        return {
-          success: false,
-          message: data.message || 'Error al actualizar estado',
         };
       }
     } catch (error: any) {

@@ -108,7 +108,7 @@ export default function AdminPanel() {
       setLoading(true);
       console.log('Cargando datos del dashboard...');
 
-      // ✅ Cargar usuarios, estadísticas, multas, histórico Y espacios en paralelo
+      // Cargar usuarios, estadísticas, multas, histórico Y espacios en paralelo
       const [usuariosResult, statsResult, finesResult, historyResult, spacesResult] = await Promise.all([
         AdminUserService.getAllUsers(token),
         AdminUserService.getStats(token),

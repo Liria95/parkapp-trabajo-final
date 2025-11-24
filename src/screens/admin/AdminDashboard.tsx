@@ -16,7 +16,7 @@ import BottomTabNavigation from '../../components/navigation/BottomTabNavigation
 // Servicios
 import { AdminUserService } from '../../services/AdminUserService';
 import { FinesService } from '../../services/FinesService';
-import { ParkingSpacesService, ParkingSession } from '../../services/ParkingSpacesService';
+import { ParkingSessionService, ActiveSessionDetail } from '../../services/parkingSessionService';
 import { AuthContext } from '../../components/shared/Context/AuthContext/AuthContext';
 
 // Theme
@@ -76,7 +76,7 @@ const AdminDashboard: React.FC = () => {
   });
 
   const [activeUsers, setActiveUsers] = useState<ActiveUser[]>([]);
-  const [activeSessions, setActiveSessions] = useState<ParkingSession[]>([]);
+  const [activeSessions, setActiveSessions] = useState<ActiveSessionDetail[]>([]);
 
   useFocusEffect(
     React.useCallback(() => {
@@ -103,8 +103,8 @@ const AdminDashboard: React.FC = () => {
       let espaciosTotales = 0;
 
       try {
-        const spacesResult = await ParkingSpacesService.getSpacesStats(token);
-        console.log('Estadísticas de espacios:', spacesResult);
+        const spacesResult = await ParkingSessionService.getStats(token);
+        console.log('Estadísticas de sesiones:', spacesResult);
 
         if (spacesResult.success && spacesResult.stats) {
           espaciosLibres = spacesResult.stats.available || 0;
@@ -191,17 +191,13 @@ const AdminDashboard: React.FC = () => {
       const startTime = new Date(session.startTime);
       const elapsed = Math.floor((Date.now() - startTime.getTime()) / (1000 * 60));
       const tipo = session.isVisitor ? 'Visitante' : 'Usuario';
-
-      const codigo = session.spaceCode || session.spaceNumber || 'N/A';
-      const ubicacion = session.streetAddress || session.location || 'No especificada';
-      const tarifa = session.feePerHour || session.rate || 0;
-
-      return `${index + 1}. ${codigo}\n` +
+      
+      return `${index + 1}. ${session.spaceCode}\n` +
              `   Patente: ${session.licensePlate}\n` +
              `   Tipo: ${tipo}\n` +
-             `   Ubicación: ${ubicacion}\n` +
+             `   Ubicación: ${session.streetAddress}\n` +
              `   Tiempo: ${elapsed} min\n` +
-             `   Tarifa: $${tarifa}/h`;
+             `   Tarifa: $${session.feePerHour}/h`;
     }).join('\n\n');
 
     Alert.alert(
@@ -219,10 +215,9 @@ const AdminDashboard: React.FC = () => {
   };
 
   const handleVerEspaciosLibres = () => {
-    const mensaje =
-      `Espacios disponibles: ${stats.freeSpaces}\n` +
-      `Total de espacios: ${stats.totalSpaces}\n\n` +
-      `Estos espacios están listos para ser ocupados por los usuarios.`;
+    const mensaje = `Espacios disponibles: ${stats.freeSpaces}\n` +
+                   `Total de espacios: ${stats.totalSpaces}\n\n` +
+                   `Estos espacios están listos para ser ocupados por los usuarios.`;
 
     Alert.alert(
       'Espacios Libres',
@@ -299,7 +294,7 @@ const AdminDashboard: React.FC = () => {
 
   const handleUserAction = (userId: string) => {
     const user = activeUsers.find(u => u.id === userId);
-
+    
     if (!user) {
       Alert.alert('Error', 'Usuario no encontrado');
       return;

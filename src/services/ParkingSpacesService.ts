@@ -1,16 +1,6 @@
 import { API_URLS } from '../config/api.config';
 
-const API_URL = API_URLS.PARKING_SPACES || `${API_URLS.USERS}/parking-spaces`;
-
-export interface ParkingSpace {
-  id: string;
-  spaceCode: string;
-  streetAddress: string;
-  status: 'available' | 'occupied';
-  feePerHour: number;
-  latitude?: number;
-  longitude?: number;
-}
+const API_URL = API_URLS.PARKING_SPACES;
 
 export interface EspacioDisponible {
   id: string;
@@ -19,7 +9,18 @@ export interface EspacioDisponible {
   tarifaPorHora: number;
   latitude: number;
   longitude: number;
+  status: string;
   distancia?: number;
+}
+
+export interface ParkingSpace {
+  id: string;
+  spaceCode: string;
+  streetAddress: string;
+  status: 'available' | 'occupied';
+  feePerHour: number;
+  latitude: number;
+  longitude: number;
 }
 
 export interface SpacesStats {
@@ -28,25 +29,12 @@ export interface SpacesStats {
   occupied: number;
 }
 
-export interface ParkingSession {
-  id: string;
-  licensePlate: string;
-  spaceNumber?: string;
-  spaceCode?: string;
-  location?: string;
-  streetAddress?: string;
-  userName?: string;
-  startTime: string;
-  rate?: number;
-  feePerHour?: number;
-  userId?: string;
-  isVisitor?: boolean;
-  status: 'active' | 'completed';
-}
-
 export class ParkingSpacesService {
   
-  static async getAvailableSpacesForUser(
+  /**
+   * Obtener espacios disponibles para usuarios
+   */
+  static async getAvailableSpaces(
     authToken: string,
     location?: {
       latitude: number;
@@ -60,9 +48,8 @@ export class ParkingSpacesService {
     message?: string;
   }> {
     try {
-      console.log('Obteniendo espacios disponibles para usuario...');
-      console.log('Ubicacion:', location);
-
+      console.log('Obteniendo espacios disponibles...');
+      
       let url = `${API_URL}/available`;
       
       if (location) {
@@ -72,6 +59,7 @@ export class ParkingSpacesService {
           ...(location.radius && { radius: location.radius.toString() })
         });
         url += `?${params.toString()}`;
+        console.log('Con filtro de ubicación:', location);
       }
 
       console.log('URL:', url);
@@ -84,12 +72,10 @@ export class ParkingSpacesService {
         },
       });
 
-      console.log('Status de respuesta:', response.status);
-
       const data = await response.json();
-      console.log('Espacios recibidos:', data.total);
 
       if (response.ok && data.success) {
+        console.log('Espacios obtenidos:', data.total);
         return {
           success: true,
           espacios: data.espacios,
@@ -102,78 +88,61 @@ export class ParkingSpacesService {
         };
       }
     } catch (error: any) {
-      console.error('Error de conexion:', error);
+      console.error('Error de conexión:', error);
       return {
         success: false,
-        message: `Error de conexion: ${error.message}`,
+        message: `Error de conexión: ${error.message}`,
       };
     }
   }
 
-  static async getSpacesStats(
+  /**
+   * Obtener estadísticas de espacios (solo admin)
+   */
+  static async getStats(
     authToken: string
   ): Promise<{
     success: boolean;
     stats?: SpacesStats;
-    activeSessions?: ParkingSession[];
     message?: string;
   }> {
     try {
-      console.log('Obteniendo estadisticas de espacios...');
+      console.log('Obteniendo estadísticas de espacios...');
 
-      const response = await fetch(
-        `${API_URLS.USERS.replace('/users', '')}/parking-sessions/stats`,
-        {
-          method: 'GET',
-          headers: {
-            'Authorization': `Bearer ${authToken}`,
-            'Content-Type': 'application/json',
-          },
-        }
-      );
-
-      console.log('Status de respuesta:', response.status);
+      const response = await fetch(`${API_URL}/stats`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${authToken}`,
+          'Content-Type': 'application/json',
+        },
+      });
 
       const data = await response.json();
-      console.log('Datos recibidos:', JSON.stringify(data, null, 2));
 
       if (response.ok && data.success) {
         console.log('Estadísticas obtenidas:', data.stats);
-        
-        const mappedSessions: ParkingSession[] = data.activeSessions 
-          ? data.activeSessions.map((session: any) => ({
-              id: session.id,
-              licensePlate: session.licensePlate,
-              spaceCode: session.spaceCode,
-              streetAddress: session.streetAddress,
-              startTime: session.startTime,
-              feePerHour: session.feePerHour,
-              userId: session.userId,
-              isVisitor: session.isVisitor || false,
-              status: 'active' as const
-            }))
-          : [];
-
         return {
           success: true,
-          stats: data.stats,
-          activeSessions: mappedSessions
+          stats: data.stats
         };
       } else {
         return {
           success: false,
-          message: data.message || 'Error al obtener estadisticas',
+          message: data.message || 'Error al obtener estadísticas',
         };
       }
     } catch (error: any) {
-      console.error('Error de conexion:', error);
+      console.error('Error de conexión:', error);
       return {
         success: false,
-        message: `Error de conexion: ${error.message}`,
+        message: `Error de conexión: ${error.message}`,
       };
     }
   }
 
+  /**
+   * Obtener todos los espacios (solo admin)
+   */
   static async getAllSpaces(
     authToken: string
   ): Promise<{
@@ -195,6 +164,7 @@ export class ParkingSpacesService {
       const data = await response.json();
 
       if (response.ok && data.success) {
+        console.log('Espacios obtenidos:', data.spaces?.length || 0);
         return {
           success: true,
           spaces: data.spaces,
@@ -206,10 +176,56 @@ export class ParkingSpacesService {
         };
       }
     } catch (error: any) {
-      console.error('Error de conexion:', error);
+      console.error('Error de conexión:', error);
       return {
         success: false,
-        message: `Error de conexion: ${error.message}`,
+        message: `Error de conexión: ${error.message}`,
+      };
+    }
+  }
+
+  /**
+   * Actualizar estado de un espacio (solo admin)
+   */
+  static async updateSpaceStatus(
+    spaceId: string,
+    status: 'available' | 'occupied' | 'maintenance' | 'reserved',
+    authToken: string
+  ): Promise<{
+    success: boolean;
+    message?: string;
+  }> {
+    try {
+      console.log('Actualizando estado del espacio:', spaceId, 'a', status);
+
+      const response = await fetch(`${API_URL}/${spaceId}/status`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${authToken}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ status })
+      });
+
+      const data = await response.json();
+
+      if (response.ok && data.success) {
+        console.log('Estado actualizado exitosamente');
+        return {
+          success: true,
+          message: data.message
+        };
+      } else {
+        return {
+          success: false,
+          message: data.message || 'Error al actualizar estado',
+        };
+      }
+    } catch (error: any) {
+      console.error('Error de conexión:', error);
+      return {
+        success: false,
+        message: `Error de conexión: ${error.message}`,
       };
     }
   }

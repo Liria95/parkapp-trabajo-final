@@ -1,4 +1,3 @@
-// src/services/NotificationsUserService.ts
 import { API_CONFIG } from '../config/api.config';
 
 const API_URL = `${API_CONFIG.BASE_URL}/api/notifications-user`;

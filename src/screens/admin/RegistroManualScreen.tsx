@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { Alert } from 'react-native';
+import { Alert, ScrollView, TouchableOpacity, View, Text as RNText } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import styled from 'styled-components/native';
 import * as SecureStore from 'expo-secure-store';
+import * as Location from 'expo-location';
 
 // Componentes reutilizables
 import AppHeader from '../../components/common/AppHeader';
@@ -12,7 +13,6 @@ import FormContainer from '../../forms/FormContainer';
 import InputField from '../../forms/InputField';
 import LocationCard from '../../components/registration/LocationCard';
 import UserFoundCard from '../../components/registration/UserFoundCard';
-import ToggleSwitch from '../../components/common/ToggleSwitch';
 import AuthButton from '../../components/auth/AuthButton';
 import AppModal from '../../components/common/AppModal';
 import { Container } from '../../components/shared/StyledComponents';
@@ -162,44 +162,73 @@ const LoadingText = styled.Text`
   padding: ${getDynamicSpacing(20)}px;
 `;
 
+const styles = {
+  filtroUbicacion: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    backgroundColor: theme.colors.lightGray,
+    marginRight: 8,
+    borderWidth: 1,
+    borderColor: 'transparent',
+  },
+  filtroUbicacionActivo: {
+    backgroundColor: theme.colors.primary,
+    borderColor: theme.colors.primary,
+  },
+  filtroUbicacionTexto: {
+    color: theme.colors.dark,
+    fontSize: 12,
+  },
+  filtroUbicacionTextoActivo: {
+    color: theme.colors.white,
+    fontWeight: 'bold' as any,
+  },
+};
+
 const RegistroManualScreen: React.FC = () => {
   const navigation = useNavigation<RegistroManualScreenNavigationProp>();
   
-  // Tipo de usuario
-  const [tipoUsuario, setTipoUsuario] = useState<'registrado' | 'visitante'>('registrado');
+  // Tipo de registro
+  const [tipoRegistro, setTipoRegistro] = useState<'multa' | 'visitante'>('multa');
+  const [subTipoVisitante, setSubTipoVisitante] = useState<'estacionamiento' | 'multa'>('estacionamiento');
   
   // Datos comunes
   const [patente, setPatente] = useState<string>('');
   const [patenteValidada, setPatenteValidada] = useState<boolean>(false);
   const [espacioSeleccionado, setEspacioSeleccionado] = useState<EspacioSeleccionado | null>(null);
-  const [notificarUsuario, setNotificarUsuario] = useState<boolean>(true);
   const [showEspaciosModal, setShowEspaciosModal] = useState<boolean>(false);
   const [loading, setLoading] = useState<boolean>(false);
   const [loadingSpaces, setLoadingSpaces] = useState<boolean>(false);
   
-  // Para usuarios registrados
-  const [searchQuery, setSearchQuery] = useState<string>('');
+  // Para filtrar por ubicación
+  const [ubicacionesFiltro, setUbicacionesFiltro] = useState<string[]>([]);
+  const [ubicacionSeleccionadaFiltro, setUbicacionSeleccionadaFiltro] = useState<string>('todas');
+  
+  // Para multas (usuario registrado)
   const [usuarioEncontrado, setUsuarioEncontrado] = useState<UsuarioEncontrado | null>(null);
   const [buscandoUsuario, setBuscandoUsuario] = useState<boolean>(false);
+  const [montoMulta, setMontoMulta] = useState<string>('');
+  const [motivoMulta, setMotivoMulta] = useState<string>('');
   
-  // Para visitantes (SOLO horas, sin nombre/email/teléfono)
-  // Se eliminan los estados: nombreVisitante, emailVisitante, telefonoVisitante
+  // Para visitantes
   const [horasEstacionamiento, setHorasEstacionamiento] = useState<string>('2');
+  
+  // Para multa a visitante (sin registro)
+  const [nombreVisitante, setNombreVisitante] = useState<string>('');
+  const [montoMultaVisitante, setMontoMultaVisitante] = useState<string>('');
+  const [motivoMultaVisitante, setMotivoMultaVisitante] = useState<string>('');
 
   const { errors, validateForm, clearError } = useFormValidation();
 
   // Espacios disponibles (desde backend)
   const [espaciosDisponibles, setEspaciosDisponibles] = useState<EspacioDisponible[]>([]);
+  const [espaciosOriginales, setEspaciosOriginales] = useState<EspacioDisponible[]>([]);
 
   // Obtener token de autenticación
   const getAuthToken = async (): Promise<string | null> => {
     try {
       const token = await SecureStore.getItemAsync('authToken');
-      console.log('Token recuperado:', token ? 'Token existe' : 'Token no existe');
-      if (token) {
-        console.log('Longitud del token:', token.length);
-        console.log('Primeros 20 caracteres:', token.substring(0, 20));
-      }
       return token;
     } catch (error) {
       console.error('Error al obtener token:', error);
@@ -209,41 +238,102 @@ const RegistroManualScreen: React.FC = () => {
 
   // Cargar espacios disponibles al montar
   useEffect(() => {
+    console.log('COMPONENTE RegistroManual');
+    console.log('Llamando a loadAvailableSpaces()...');
     loadAvailableSpaces();
   }, []);
 
   const loadAvailableSpaces = async () => {
+    console.log('INICIO loadAvailableSpaces()');
+    
     try {
       setLoadingSpaces(true);
-      console.log('Iniciando carga de espacios disponibles...');
+      console.log('Loading spaces = true');
+      console.log('========================================');
+      console.log('CARGANDO ESPACIOS DISPONIBLES');
+      console.log('========================================');
       
       const token = await getAuthToken();
+      console.log('Token obtenido:', token ? 'SÍ (primeros 20 chars): ' + token.substring(0, 20) : 'NO');
       
       if (!token) {
-        console.log('Error: No hay token de autenticacion');
+        console.log('NO HAY TOKEN');
         Alert.alert('Error', 'No hay sesión activa. Por favor, inicie sesión nuevamente.');
         return;
       }
 
-      console.log('Llamando al servicio de espacios disponibles...');
-      const response = await ManualRegistrationService.getAvailableSpaces(token);
+      // Intentar obtener ubicación GPS del admin
+      let adminLocation = undefined;
       
-      console.log('Respuesta del servicio:', JSON.stringify(response, null, 2));
+      try {
+        console.log('📍 Solicitando permisos de ubicación...');
+        const { status } = await Location.requestForegroundPermissionsAsync();
+        console.log('Status de permisos:', status);
+        
+        if (status === 'granted') {
+          console.log('Permisos concedidos, obteniendo ubicación...');
+          const location = await Location.getCurrentPositionAsync({
+            accuracy: Location.Accuracy.Balanced
+          });
+          
+          adminLocation = {
+            latitude: location.coords.latitude,
+            longitude: location.coords.longitude,
+            radius: 500 // 500km de radio
+          };
+          
+          console.log('Ubicación GPS del admin:', adminLocation);
+        } else {
+          console.log('Permisos de ubicación denegados');
+        }
+      } catch (locationError) {
+        console.log('Error al obtener ubicación GPS:', locationError);
+        console.log('→ Continuando sin GPS...');
+      }
+
+      console.log('Llamando a ManualRegistrationService.getAvailableSpaces...');
+      
+      // Llamar al servicio con o sin ubicación
+      const response = await ManualRegistrationService.getAvailableSpaces(
+        token,
+        adminLocation
+      );
+      
+      console.log('========================================');
+      console.log('RESPUESTA DEL SERVICIO:');
+      console.log('Success:', response.success);
+      console.log('Espacios:', response.espacios?.length || 0);
+      if (response.espacios && response.espacios.length > 0) {
+        console.log('Primer espacio:', response.espacios[0].numero);
+        if (response.espacios[0].distancia !== undefined) {
+          console.log('   Distancia:', response.espacios[0].distancia.toFixed(2), 'km');
+        }
+      }
+      console.log('Message:', response.message);
+      console.log('========================================');
       
       if (response.success && response.espacios) {
-        console.log('Espacios cargados exitosamente:', response.espacios.length);
+        console.log('Guardando espacios en estado...');
         setEspaciosDisponibles(response.espacios);
+        setEspaciosOriginales(response.espacios);
+        
+        // Extraer ubicaciones únicas para el filtro
+        const ubicacionesUnicas = Array.from(
+          new Set(response.espacios.map(e => e.ubicacion))
+        ).sort();
+        setUbicacionesFiltro(ubicacionesUnicas);
         
         if (response.espacios.length === 0) {
+          console.log('RESPUESTA VACÍA - No hay espacios');
           Alert.alert('Aviso', 'No hay espacios disponibles en este momento');
+        } else {
+          console.log('ESPACIOS CARGADOS CORRECTAMENTE:', response.espacios.length);
         }
       } else {
-        console.log('No se pudieron cargar espacios:', response.message);
+        console.log('ERROR EN RESPUESTA:', response.message);
         Alert.alert('Aviso', response.message || 'No hay espacios disponibles');
       }
     } catch (error: any) {
-      console.error('Error al cargar espacios:', error);
-      console.error('Error stack:', error.stack);
       Alert.alert('Error', 'No se pudieron cargar los espacios disponibles. Verifique su conexión.');
     } finally {
       setLoadingSpaces(false);
@@ -263,7 +353,7 @@ const RegistroManualScreen: React.FC = () => {
             const patenteSimulada = 'ABC' + Math.floor(Math.random() * 1000);
             setPatente(patenteSimulada);
             setPatenteValidada(false);
-            if (tipoUsuario === 'registrado') {
+            if (tipoRegistro === 'multa') {
               validarPatente(patenteSimulada);
             }
           }
@@ -279,44 +369,44 @@ const RegistroManualScreen: React.FC = () => {
     setUsuarioEncontrado(null);
     clearError('patente');
     
-    // Auto-buscar cuando tiene 6+ caracteres (usuarios registrados)
-    if (tipoUsuario === 'registrado' && text.length >= 6) {
+    // Auto-buscar cuando tiene 6+ caracteres (para multas)
+    if (tipoRegistro === 'multa' && text.length >= 6) {
       validarPatente(text);
     }
   };
 
-  // Validar patente y buscar usuario
+  // Validar patente y buscar usuario (para multas)
   const validarPatente = async (patenteValue: string) => {
-    if (tipoUsuario !== 'registrado') return;
+    if (tipoRegistro !== 'multa') return;
     
     try {
       setBuscandoUsuario(true);
-      console.log('Buscando usuario con patente:', patenteValue);
+      console.log('Buscando usuario con patente para multa:', patenteValue);
       
       const token = await getAuthToken();
       
       if (!token) {
-        console.log('Error: No hay token al validar patente');
         Alert.alert('Error', 'No hay sesión activa');
         return;
       }
 
       const response = await ManualRegistrationService.searchByPlate(patenteValue, token);
       
-      console.log('Respuesta de busqueda de usuario:', JSON.stringify(response, null, 2));
-      
       if (response.success && response.found && response.user) {
-        console.log('Usuario encontrado:', response.user.nombre);
+        console.log('Usuario encontrado para multa:', response.user.nombre);
         setUsuarioEncontrado(response.user);
         setPatenteValidada(true);
       } else {
         console.log('Usuario no encontrado con esta patente');
         setUsuarioEncontrado(null);
         setPatenteValidada(true);
+        Alert.alert(
+          'Usuario no encontrado',
+          'No se encontró un usuario registrado con esta patente. Si desea registrar un visitante, seleccione la opción "Visitante".'
+        );
       }
     } catch (error: any) {
       console.error('Error al buscar usuario:', error);
-      console.error('Error stack:', error.stack);
       setUsuarioEncontrado(null);
       setPatenteValidada(false);
       Alert.alert('Error', error.message || 'Error al buscar usuario');
@@ -327,7 +417,6 @@ const RegistroManualScreen: React.FC = () => {
 
   // Seleccionar espacio
   const handleSeleccionarEspacio = (espacio: EspacioDisponible) => {
-    console.log('Espacio seleccionado:', espacio.numero);
     setEspacioSeleccionado({
       id: espacio.id,
       numero: espacio.numero,
@@ -337,19 +426,18 @@ const RegistroManualScreen: React.FC = () => {
     setShowEspaciosModal(false);
   };
 
-  // Cambiar tipo de usuario
-  const handleTipoUsuarioChange = (tipo: 'registrado' | 'visitante') => {
-    console.log('Cambiando tipo de usuario a:', tipo);
-    setTipoUsuario(tipo);
+  // Cambiar tipo de registro
+  const handleTipoRegistroChange = (tipo: 'multa' | 'visitante') => {
+    setTipoRegistro(tipo);
     
     // Limpiar datos según tipo
     if (tipo === 'visitante') {
-      setSearchQuery('');
       setUsuarioEncontrado(null);
       setPatenteValidada(false);
+      setMontoMulta('');
+      setMotivoMulta('');
     } else {
-      // Solo limpiar la duración del visitante, ya que no hay otros datos de visitante
-      setHorasEstacionamiento('2'); 
+      setHorasEstacionamiento('2');
     }
   };
 
@@ -360,10 +448,22 @@ const RegistroManualScreen: React.FC = () => {
     return espacioSeleccionado.tarifaPorHora * horas;
   };
 
+  // Filtrar espacios por ubicación seleccionada
+  const handleFiltrarPorUbicacion = (ubicacion: string) => {
+    setUbicacionSeleccionadaFiltro(ubicacion);
+    
+    if (ubicacion === 'todas') {
+      setEspaciosDisponibles(espaciosOriginales);
+    } else {
+      const espaciosFiltrados = espaciosOriginales.filter(
+        e => e.ubicacion === ubicacion
+      );
+      setEspaciosDisponibles(espaciosFiltrados);
+    }
+  };
+
   // Validaciones y confirmación
   const handleRegistrar = async (): Promise<void> => {
-    console.log('Iniciando proceso de registro...');
-    console.log('Tipo de usuario:', tipoUsuario);
     
     // Validación común
     if (!patente || patente.length < 6) {
@@ -371,166 +471,208 @@ const RegistroManualScreen: React.FC = () => {
       return;
     }
 
-    if (!espacioSeleccionado) {
-      Alert.alert('Error', 'Debe seleccionar un espacio de estacionamiento');
-      return;
-    }
-
-    // Validaciones específicas según tipo de usuario
-    if (tipoUsuario === 'registrado') {
+    // Validaciones específicas según tipo de registro
+    if (tipoRegistro === 'multa') {
       if (!usuarioEncontrado) {
         Alert.alert(
           'Error', 
-          'No se encontró un usuario registrado con esta patente.\n\nSeleccione "Visitante" si la persona no tiene cuenta en ParkApp.'
+          'No se encontró un usuario registrado con esta patente.\n\nPara registrar un visitante, seleccione la opción "Visitante".'
         );
         return;
       }
 
-      // Verificar saldo mínimo
-      if (usuarioEncontrado.saldo < espacioSeleccionado.tarifaPorHora) {
-        Alert.alert(
-          'Saldo Insuficiente',
-          `El usuario necesita al menos $${espacioSeleccionado.tarifaPorHora} para estacionar.\n\nSaldo actual: $${usuarioEncontrado.saldo.toFixed(2)}`
-        );
+      if (!espacioSeleccionado) {
+        Alert.alert('Error', 'Debe seleccionar la ubicación donde ocurrió la infracción');
         return;
       }
 
-      // Confirmar registro de usuario
+      if (!montoMulta || parseFloat(montoMulta) <= 0) {
+        Alert.alert('Error', 'Ingrese un monto de multa válido');
+        return;
+      }
+
+      if (!motivoMulta || motivoMulta.trim().length < 5) {
+        Alert.alert('Error', 'Ingrese un motivo de la multa (mínimo 5 caracteres)');
+        return;
+      }
+
+      // Confirmar multa
       Alert.alert(
-        'Confirmar Registro',
-        `Usuario: ${usuarioEncontrado.nombre}\nPatente: ${patente}\nEspacio: ${espacioSeleccionado.numero}\nUbicación: ${espacioSeleccionado.ubicacion}\n\n¿Confirmar registro?`,
+        'Confirmar Multa',
+        `Usuario: ${usuarioEncontrado.nombre}\nPatente: ${patente}\nUbicación: ${espacioSeleccionado.ubicacion}\nEspacio: ${espacioSeleccionado.numero}\nMonto: $${parseFloat(montoMulta).toFixed(2)}\nMotivo: ${motivoMulta}\n\n¿Confirmar la multa?`,
         [
           { text: 'Cancelar', style: 'cancel' },
           {
-            text: 'Confirmar',
-            onPress: () => procesarRegistro()
+            text: 'Confirmar Multa',
+            style: 'destructive',
+            onPress: () => procesarMulta()
           }
         ]
       );
     } else {
-      // Visitante - SOLO validar horas
-      const horas = parseFloat(horasEstacionamiento);
-      if (!horas || horas <= 0) {
-        Alert.alert('Error', 'Ingrese una cantidad de horas válida');
-        return;
-      }
+      // Visitante - diferenciar entre estacionamiento y multa
+      if (subTipoVisitante === 'estacionamiento') {
+        // Validar estacionamiento
+        if (!espacioSeleccionado) {
+          Alert.alert('Error', 'Debe seleccionar un espacio de estacionamiento');
+          return;
+        }
 
-      const total = calcularTotal();
-      
-      // Confirmar pago en efectivo
-      Alert.alert(
-        'Confirmar Pago en Efectivo',
-        `Visitante: Patente ${patente}\nEspacio: ${espacioSeleccionado.numero}\nUbicación: ${espacioSeleccionado.ubicacion}\nDuración: ${horasEstacionamiento}h\n\nTotal a cobrar: $${total.toFixed(2)}\n(${horasEstacionamiento}h × $${espacioSeleccionado.tarifaPorHora}/h)\n\n¿Recibió el pago en efectivo?`,
-        [
-          { text: 'No', style: 'cancel' },
-          {
-            text: 'Sí, recibí el pago',
-            onPress: () => procesarRegistro(total)
-          }
-        ]
-      );
+        const horas = parseFloat(horasEstacionamiento);
+        if (!horas || horas <= 0) {
+          Alert.alert('Error', 'Ingrese una cantidad de horas válida');
+          return;
+        }
+
+        const total = calcularTotal();
+        
+        // Confirmar pago en efectivo AL MOMENTO
+        Alert.alert(
+          'Confirmar Pago en Efectivo',
+          `Visitante: Patente ${patente}\nEspacio: ${espacioSeleccionado.numero}\nUbicación: ${espacioSeleccionado.ubicacion}\n\nDuración: ${horasEstacionamiento}h\nTarifa: $${espacioSeleccionado.tarifaPorHora}/hora\n\nTotal a cobrar: $${total.toFixed(2)}\n\n💰 ¿Recibió el pago en efectivo?`,
+          [
+            { text: 'No', style: 'cancel' },
+            {
+              text: 'Sí, recibí $' + total.toFixed(2),
+              onPress: () => procesarVisitante(total)
+            }
+          ]
+        );
+      } else {
+        // Validar multa a visitante
+        if (!espacioSeleccionado) {
+          Alert.alert('Error', 'Debe seleccionar la ubicación donde ocurrió la infracción');
+          return;
+        }
+
+        if (!montoMultaVisitante || parseFloat(montoMultaVisitante) <= 0) {
+          Alert.alert('Error', 'Ingrese un monto de multa válido');
+          return;
+        }
+
+        if (!motivoMultaVisitante || motivoMultaVisitante.trim().length < 5) {
+          Alert.alert('Error', 'Ingrese un motivo de la multa (mínimo 5 caracteres)');
+          return;
+        }
+
+        const nombreFinal = nombreVisitante.trim() || `Visitante ${patente}`;
+        
+        // Confirmar multa a visitante con pago en efectivo
+        Alert.alert(
+          'Confirmar Multa a Visitante',
+          `VISITANTE NO REGISTRADO\n\nPatente: ${patente}\nNombre: ${nombreFinal}\nUbicación: ${espacioSeleccionado.ubicacion}\nEspacio: ${espacioSeleccionado.numero}\nMonto: $${parseFloat(montoMultaVisitante).toFixed(2)}\nMotivo: ${motivoMultaVisitante}\n\nSe creará un usuario temporal y se aplicará la multa.\n\n💰 ¿Recibió el pago en efectivo de $${parseFloat(montoMultaVisitante).toFixed(2)}?`,
+          [
+            { text: 'No, cancelar', style: 'cancel' },
+            {
+              text: 'Sí, recibí el pago',
+              style: 'destructive',
+              onPress: () => procesarMultaVisitante()
+            }
+          ]
+        );
+      }
     }
   };
 
-  // Procesar el registro (backend)
-  const procesarRegistro = async (montoVisitante?: number): Promise<void> => {
+  // Procesar multa
+  const procesarMulta = async (): Promise<void> => {
     setLoading(true);
-    console.log('Procesando registro...');
+    console.log('Procesando multa...');
     
     try {
       const token = await getAuthToken();
       
       if (!token) {
-        console.log('Error: No hay token al procesar registro');
         Alert.alert('Error', 'No hay sesión activa');
         setLoading(false);
         return;
       }
 
-      if (tipoUsuario === 'registrado' && usuarioEncontrado) {
-        console.log('Registrando usuario con cuenta...');
-        console.log('Datos:', {
-          userId: usuarioEncontrado.id,
-          vehicleId: usuarioEncontrado.vehicleId,
-          parkingSpaceId: espacioSeleccionado!.id,
-          sendNotification: notificarUsuario
-        });
+      // Crear la multa en Firebase
+      const response = await ManualRegistrationService.createFine(
+        {
+          userId: usuarioEncontrado!.id,
+          licensePlate: patente,
+          reason: motivoMulta,
+          amount: parseFloat(montoMulta),
+          location: `${espacioSeleccionado!.ubicacion} - Espacio ${espacioSeleccionado!.numero}`,
+          parkingSpaceId: espacioSeleccionado!.id
+        },
+        token
+      );
+
+      if (response.success && response.data) {
+        console.log('Multa creada exitosamente');
         
-        // Registrar usuario con cuenta
-        const response = await ManualRegistrationService.registerUser(
-          {
-            userId: usuarioEncontrado.id,
-            vehicleId: usuarioEncontrado.vehicleId,
-            parkingSpaceId: espacioSeleccionado!.id,
-            sendNotification: notificarUsuario
-          },
-          token
-        );
+        const mensaje = `Multa registrada exitosamente\n\n` +
+          `Número de multa: #${response.data.numero}\n` +
+          `Usuario: ${usuarioEncontrado!.nombre}\n` +
+          `Email: ${usuarioEncontrado!.email}\n` +
+          `Patente: ${patente}\n` +
+          `Ubicación: ${espacioSeleccionado!.ubicacion}\n` +
+          `Espacio: ${espacioSeleccionado!.numero}\n` +
+          `Monto: $${parseFloat(montoMulta).toFixed(2)}\n` +
+          `Motivo: ${motivoMulta}\n\n` +
+          `La multa ha sido registrada en el sistema y el usuario puede verla en su historial.`;
 
-        console.log('Respuesta de registro de usuario:', JSON.stringify(response, null, 2));
-
-        if (response.success && response.data) {
-          console.log('Usuario registrado exitosamente');
-          
-          const mensaje = `Vehículo registrado exitosamente\n\n` +
-            `Patente: ${patente}\n` +
-            `Usuario: ${usuarioEncontrado.nombre}\n` +
-            `Espacio: ${response.data.espacioCodigo}\n` +
-            `Ubicación: ${response.data.ubicacion}\n` +
-            `Tarifa: $${response.data.tarifaPorHora}/h\n\n` +
-            `${notificarUsuario ? 'Notificación enviada' : 'Sin notificación'}`;
-
-          Alert.alert('Registro Exitoso', mensaje, [
-            { text: 'OK', onPress: resetForm }
-          ]);
-        } else {
-          console.log('Error al registrar:', response.message);
-          Alert.alert('Error', response.message || 'Error al registrar');
-        }
+        Alert.alert('Multa Registrada', mensaje, [
+          { text: 'OK', onPress: resetForm }
+        ]);
       } else {
-        console.log('Registrando visitante (simplificado)...');
-        // Los campos de nombre, email, y teléfono del visitante han sido eliminados de aquí.
-        console.log('Datos:', {
+        Alert.alert('Error', response.message || 'Error al registrar la multa');
+      }
+
+    } catch (error: any) {
+      Alert.alert(
+        'Error al Registrar Multa',
+        error.message || 'Ocurrió un error al procesar la multa. Intente nuevamente.'
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Procesar visitante
+  const procesarVisitante = async (montoVisitante: number): Promise<void> => {
+    setLoading(true);    
+    try {
+      const token = await getAuthToken();
+      
+      if (!token) {
+        Alert.alert('Error', 'No hay sesión activa');
+        setLoading(false);
+        return;
+      }
+
+      const response = await ManualRegistrationService.registerVisitor(
+        {
           licensePlate: patente,
           parkingSpaceId: espacioSeleccionado!.id,
           hours: parseFloat(horasEstacionamiento)
-        });
-        
-        // Registrar visitante simplificado (SOLO patente y horas)
-        const response = await ManualRegistrationService.registerVisitor(
-          {
-            licensePlate: patente,
-            parkingSpaceId: espacioSeleccionado!.id,
-            hours: parseFloat(horasEstacionamiento)
-            // Se eliminan: name, email, phone, sendNotification (porque ya no hay email)
-          },
-          token
-        );
+        },
+        token
+      );
 
-        console.log('Respuesta de registro de visitante:', JSON.stringify(response, null, 2));
+      if (response.success && response.data) {
+        const mensaje = `Visitante registrado exitosamente\n\n` +
+          `Pago recibido: $${response.data.totalAmount.toFixed(2)}\n\n` +
+          `Patente: ${patente}\n` +
+          `Espacio: ${response.data.espacioCodigo}\n` +
+          `Ubicación: ${response.data.ubicacion}\n` +
+          `Duración: ${response.data.hours}h\n` +
+          `Tarifa: $${response.data.tarifaPorHora}/hora\n\n` +
+          `Inicio: ${new Date(response.data.startTime).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })}\n` +
+          `Fin estimado: ${new Date(response.data.endTime).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })}\n\n` +
+          `ℹEl admin puede finalizar la sesión antes si el visitante se retira temprano.`;
 
-        if (response.success && response.data) {
-          console.log('Visitante registrado exitosamente');
-          
-          const mensaje = `Visitante registrado exitosamente\n\n` +
-            `Patente: ${patente}\n` +
-            `Espacio: ${response.data.espacioCodigo}\n` +
-            `Ubicación: ${response.data.ubicacion}\n` +
-            `Duración: ${response.data.hours}h\n` +
-            `Total cobrado: $${response.data.totalAmount.toFixed(2)}\n\n` +
-            `Se creó un registro temporal con la patente en el sistema.`;
-
-          Alert.alert('Registro Exitoso', mensaje, [
-            { text: 'OK', onPress: resetForm }
-          ]);
-        } else {
-          console.log('Error al registrar visitante:', response.message);
-          Alert.alert('Error', response.message || 'Error al registrar visitante');
-        }
+        Alert.alert('Registro Exitoso', mensaje, [
+          { text: 'OK', onPress: resetForm }
+        ]);
+      } else {
+        Alert.alert('Error', response.message || 'Error al registrar visitante');
       }
     } catch (error: any) {
-      console.error('Error al registrar:', error);
-      console.error('Error stack:', error.stack);
+      console.error('Error al registrar visitante:', error);
       Alert.alert(
         'Error al Registrar',
         error.message || 'Ocurrió un error al procesar el registro. Intente nuevamente.'
@@ -540,17 +682,75 @@ const RegistroManualScreen: React.FC = () => {
     }
   };
 
+  // Procesar multa a visitante (crear usuario temporal + multa)
+  const procesarMultaVisitante = async (): Promise<void> => {
+    setLoading(true);
+    console.log('Procesando multa a visitante no registrado...');
+    
+    try {
+      const token = await getAuthToken();
+      
+      if (!token) {
+        Alert.alert('Error', 'No hay sesión activa');
+        setLoading(false);
+        return;
+      }
+
+      const nombreFinal = nombreVisitante.trim() || `Visitante ${patente}`;
+      
+      // Llamar al servicio que creará usuario temporal + multa
+      const response = await ManualRegistrationService.createVisitorFine(
+        {
+          licensePlate: patente,
+          visitorName: nombreFinal,
+          parkingSpaceId: espacioSeleccionado!.id,
+          reason: motivoMultaVisitante,
+          amount: parseFloat(montoMultaVisitante),
+          location: `${espacioSeleccionado!.ubicacion} - Espacio ${espacioSeleccionado!.numero}`
+        },
+        token
+      );
+
+      if (response.success && response.data) {
+        const mensaje = `Multa a visitante registrada exitosamente\n\n` +
+          `Número de multa: #${response.data.fineNumero}\n` +
+          `Patente: ${patente}\n` +
+          `Nombre: ${nombreFinal}\n` +
+          `Ubicación: ${espacioSeleccionado!.ubicacion}\n` +
+          `Espacio: ${espacioSeleccionado!.numero}\n` +
+          `Monto: $${parseFloat(montoMultaVisitante).toFixed(2)}\n` +
+          `Motivo: ${motivoMultaVisitante}\n\n` +
+          `Pagado en efectivo\n` +
+          `Se creó un usuario temporal y la multa fue registrada.`;
+
+        Alert.alert('Multa Registrada', mensaje, [
+          { text: 'OK', onPress: resetForm }
+        ]);
+      } else {
+        Alert.alert('Error', response.message || 'Error al registrar la multa');
+      }
+    } catch (error: any) {
+      Alert.alert(
+        'Error al Registrar Multa',
+        error.message || 'Ocurrió un error al procesar la multa. Intente nuevamente.'
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // Resetear formulario
   const resetForm = () => {
-    console.log('Reseteando formulario...');
     setPatente('');
     setPatenteValidada(false);
     setEspacioSeleccionado(null);
     setUsuarioEncontrado(null);
-    setNotificarUsuario(true);
-    setSearchQuery('');
-    // Se eliminan los resets de: setNombreVisitante, setEmailVisitante, setTelefonoVisitante
+    setMontoMulta('');
+    setMotivoMulta('');
     setHorasEstacionamiento('2');
+    setNombreVisitante(''); // ← Limpiar multa visitante
+    setMontoMultaVisitante(''); // ← Limpiar multa visitante
+    setMotivoMultaVisitante(''); // ← Limpiar multa visitante
     setLoading(false);
     
     // Recargar espacios
@@ -562,28 +762,28 @@ const RegistroManualScreen: React.FC = () => {
     <Container>
       <AppHeader
         title="Registro Manual"
-        subtitle="Registrar estacionamiento sin app"
+        subtitle="Multas y visitantes"
         onBackPress={() => navigation.goBack()}
         showBackButton={true}
       />
 
       <ContentScrollView showsVerticalScrollIndicator={false}>
-        {/* Selector de tipo de usuario */}
+        {/* Selector de tipo de registro */}
         <UserTypeSelector>
           <UserTypeButton
-            selected={tipoUsuario === 'registrado'}
-            onPress={() => handleTipoUsuarioChange('registrado')}
+            selected={tipoRegistro === 'multa'}
+            onPress={() => handleTipoRegistroChange('multa')}
           >
-            <UserTypeText selected={tipoUsuario === 'registrado'}>
-              Usuario Registrado
+            <UserTypeText selected={tipoRegistro === 'multa'}>
+              Multa
             </UserTypeText>
           </UserTypeButton>
 
           <UserTypeButton
-            selected={tipoUsuario === 'visitante'}
-            onPress={() => handleTipoUsuarioChange('visitante')}
+            selected={tipoRegistro === 'visitante'}
+            onPress={() => handleTipoRegistroChange('visitante')}
           >
-            <UserTypeText selected={tipoUsuario === 'visitante'}>
+            <UserTypeText selected={tipoRegistro === 'visitante'}>
               Visitante
             </UserTypeText>
           </UserTypeButton>
@@ -592,11 +792,36 @@ const RegistroManualScreen: React.FC = () => {
         {/* Info según tipo */}
         <InfoCard>
           <InfoText>
-            {tipoUsuario === 'registrado'
-              ? 'Para usuarios con cuenta en ParkApp. El tiempo se descontará de su saldo.'
-              : 'Para personas sin cuenta. Solo necesita la patente. El pago es en efectivo.'}
+            {tipoRegistro === 'multa'
+              ? 'Buscar usuario registrado por patente para aplicar una multa.'
+              : subTipoVisitante === 'estacionamiento'
+              ? 'Registrar estacionamiento de visitante. Cobrar en efectivo al momento.'
+              : 'Multar a un visitante no registrado. Se creará un registro temporal con la patente.'}
           </InfoText>
         </InfoCard>
+
+        {/* Sub-selector para visitantes */}
+        {tipoRegistro === 'visitante' && (
+          <UserTypeSelector>
+            <UserTypeButton
+              selected={subTipoVisitante === 'estacionamiento'}
+              onPress={() => setSubTipoVisitante('estacionamiento')}
+            >
+              <UserTypeText selected={subTipoVisitante === 'estacionamiento'}>
+                Estacionar
+              </UserTypeText>
+            </UserTypeButton>
+
+            <UserTypeButton
+              selected={subTipoVisitante === 'multa'}
+              onPress={() => setSubTipoVisitante('multa')}
+            >
+              <UserTypeText selected={subTipoVisitante === 'multa'}>
+                Multar
+              </UserTypeText>
+            </UserTypeButton>
+          </UserTypeSelector>
+        )}
 
         <ScannerSection onCameraPress={handleScanCamera} />
 
@@ -616,77 +841,148 @@ const RegistroManualScreen: React.FC = () => {
           )}
         </FormContainer>
 
-        <LocationCard 
-          espacioSeleccionado={espacioSeleccionado}
-          onLocationPress={() => setShowEspaciosModal(true)}
-        />
-
-        {/* FORMULARIO PARA USUARIOS REGISTRADOS */}
-        {tipoUsuario === 'registrado' && (
+        {/* FORMULARIO PARA MULTAS */}
+        {tipoRegistro === 'multa' && (
           <>
-            <FormContainer paddingHorizontal={20}>
-              <InputField
-                label="Buscar usuario (opcional)"
-                iconName="search-outline"
-                placeholder="Email o teléfono del usuario"
-                value={searchQuery}
-                onChangeText={setSearchQuery}
-                keyboardType="email-address"
-                autoCapitalize="none"
-              />
-            </FormContainer>
-
             {usuarioEncontrado && (
               <UserFoundCard usuario={usuarioEncontrado} />
             )}
-          </>
-        )}
 
-        {/* FORMULARIO SIMPLIFICADO PARA VISITANTES */}
-        {tipoUsuario === 'visitante' && (
-          <>
-            <SectionTitle>Duración del Estacionamiento</SectionTitle>
-            
-            <FormContainer paddingHorizontal={20}>
-              {/* Se eliminan: Nombre, Email, Teléfono del visitante */}
+            {usuarioEncontrado && (
+              <>
+                <SectionTitle>Ubicación de la Infracción</SectionTitle>
+                
+                <LocationCard 
+                  espacioSeleccionado={espacioSeleccionado}
+                  onLocationPress={() => setShowEspaciosModal(true)}
+                />
 
-              <InputField
-                label="Horas de Estacionamiento *"
-                iconName="time-outline"
-                placeholder="2"
-                value={horasEstacionamiento}
-                onChangeText={setHorasEstacionamiento}
-                keyboardType="numeric"
-              />
-            </FormContainer>
+                <FormContainer paddingHorizontal={20}>
+                  <InputField
+                    label="Monto de la Multa *"
+                    iconName="cash-outline"
+                    placeholder="500"
+                    value={montoMulta}
+                    onChangeText={setMontoMulta}
+                    keyboardType="numeric"
+                  />
 
-            {espacioSeleccionado && horasEstacionamiento && (
-              <InfoCard>
-                <InfoText style={{ fontWeight: 'bold', fontSize: getResponsiveSize(16) }}>
-                  Total a cobrar: ${calcularTotal().toFixed(2)}
-                </InfoText>
-                <InfoText>
-                  {horasEstacionamiento}h × ${espacioSeleccionado.tarifaPorHora}/h
-                </InfoText>
-                 <InfoText style={{ marginTop: 10, fontStyle: 'italic' }}>
-                   Se creará un registro temporal con la patente {patente || '[patente]'} en el sistema.
-                 </InfoText>
-              </InfoCard>
+                  <InputField
+                    label="Motivo de la Multa *"
+                    iconName="document-text-outline"
+                    placeholder="Estacionamiento indebido, exceso de tiempo, etc."
+                    value={motivoMulta}
+                    onChangeText={setMotivoMulta}
+                    multiline
+                    numberOfLines={3}
+                  />
+                </FormContainer>
+              </>
             )}
           </>
         )}
 
-        {/* TOGGLE solo visible para usuarios registrados (se eliminan las opciones de email para visitantes) */}
-        {tipoUsuario === 'registrado' && (
-          <ToggleSwitch
-            title="Notificar al usuario"
-            subtitle="Enviar notificación push" 
-            value={notificarUsuario}
-            onToggle={() => setNotificarUsuario(!notificarUsuario)}
-          />
+        {/* FORMULARIO PARA VISITANTES */}
+        {tipoRegistro === 'visitante' && (
+          <>
+            {/* ESTACIONAMIENTO DE VISITANTE */}
+            {subTipoVisitante === 'estacionamiento' && (
+              <>
+                <LocationCard 
+                  espacioSeleccionado={espacioSeleccionado}
+                  onLocationPress={() => setShowEspaciosModal(true)}
+                />
+
+                <SectionTitle>Duración del Estacionamiento</SectionTitle>
+                
+                <FormContainer paddingHorizontal={20}>
+                  <InputField
+                    label="Horas de Estacionamiento *"
+                    iconName="time-outline"
+                    placeholder="2"
+                    value={horasEstacionamiento}
+                    onChangeText={setHorasEstacionamiento}
+                    keyboardType="numeric"
+                  />
+                </FormContainer>
+
+                {espacioSeleccionado && horasEstacionamiento && (
+                  <InfoCard>
+                    <InfoText style={{ fontWeight: 'bold', fontSize: getResponsiveSize(16) }}>
+                      Total a cobrar: ${calcularTotal().toFixed(2)}
+                    </InfoText>
+                    <InfoText>
+                      {horasEstacionamiento}h × ${espacioSeleccionado.tarifaPorHora}/h
+                    </InfoText>
+                    <InfoText style={{ marginTop: 10, fontStyle: 'italic' }}>
+                      Pago en efectivo al momento del registro
+                    </InfoText>
+                    <InfoText style={{ marginTop: 5, fontStyle: 'italic' }}>
+                      El admin puede finalizar antes si se retira temprano
+                    </InfoText>
+                  </InfoCard>
+                )}
+              </>
+            )}
+
+            {/* MULTA A VISITANTE */}
+            {subTipoVisitante === 'multa' && (
+              <>
+                <SectionTitle>Datos del Visitante</SectionTitle>
+                
+                <FormContainer paddingHorizontal={20}>
+                  <InputField
+                    label="Nombre del Visitante (Opcional)"
+                    iconName="person-outline"
+                    placeholder="Ej: Juan Pérez"
+                    value={nombreVisitante}
+                    onChangeText={setNombreVisitante}
+                  />
+                </FormContainer>
+
+                <SectionTitle>Ubicación de la Infracción</SectionTitle>
+                
+                <LocationCard 
+                  espacioSeleccionado={espacioSeleccionado}
+                  onLocationPress={() => setShowEspaciosModal(true)}
+                />
+
+                <FormContainer paddingHorizontal={20}>
+                  <InputField
+                    label="Monto de la Multa *"
+                    iconName="cash-outline"
+                    placeholder="500"
+                    value={montoMultaVisitante}
+                    onChangeText={setMontoMultaVisitante}
+                    keyboardType="numeric"
+                  />
+
+                  <InputField
+                    label="Motivo de la Multa *"
+                    iconName="document-text-outline"
+                    placeholder="Estacionamiento indebido, exceso de tiempo, etc."
+                    value={motivoMultaVisitante}
+                    onChangeText={setMotivoMultaVisitante}
+                    multiline
+                    numberOfLines={3}
+                  />
+                </FormContainer>
+
+                <InfoCard>
+                  <InfoText style={{ fontWeight: 'bold' }}>
+                    Multa a visitante no registrado
+                  </InfoText>
+                  <InfoText style={{ marginTop: 5 }}>
+                    Se creará un usuario temporal con:
+                    {'\n'}• Patente: {patente || '[patente]'}
+                    {'\n'}• Nombre: {nombreVisitante || 'Visitante ' + patente}
+                    {'\n'}• Email: visitante_{patente.toLowerCase()}@temp.com
+                  </InfoText>
+                </InfoCard>
+              </>
+            )}
+          </>
         )}
-        
-        {/* En el caso de Visitante, el toggle de notificación se oculta y la lógica de registro simplificada ya no lo usa. */}
 
         <ActionsContainer>
           <ActionButton onPress={() => navigation.goBack()}>
@@ -694,7 +990,13 @@ const RegistroManualScreen: React.FC = () => {
           </ActionButton>
           <ActionButton primary onPress={handleRegistrar} disabled={loading}>
             <ActionButtonText>
-              {loading ? 'Registrando...' : 'Registrar'}
+              {loading 
+                ? 'Procesando...' 
+                : tipoRegistro === 'multa' 
+                ? 'Registrar Multa' 
+                : subTipoVisitante === 'estacionamiento'
+                ? 'Registrar Estacionamiento'
+                : 'Registrar Multa a Visitante'}
             </ActionButtonText>
           </ActionButton>
         </ActionsContainer>
@@ -706,6 +1008,59 @@ const RegistroManualScreen: React.FC = () => {
         title="Seleccionar Espacio"
         onClose={() => setShowEspaciosModal(false)}
       >
+        {/* Filtro de ubicación */}
+        {ubicacionesFiltro.length > 1 && (
+          <View style={{ marginBottom: 15 }}>
+            <RNText style={{ fontSize: 12, color: '#666', marginBottom: 8, fontWeight: 'bold' }}>
+              Filtrar por ubicación:
+            </RNText>
+            <ScrollView 
+              horizontal 
+              showsHorizontalScrollIndicator={false}
+              style={{ marginBottom: 10 }}
+            >
+              <TouchableOpacity
+                style={[
+                  styles.filtroUbicacion,
+                  ubicacionSeleccionadaFiltro === 'todas' && styles.filtroUbicacionActivo
+                ]}
+                onPress={() => handleFiltrarPorUbicacion('todas')}
+              >
+                <RNText style={[
+                  styles.filtroUbicacionTexto,
+                  ubicacionSeleccionadaFiltro === 'todas' && styles.filtroUbicacionTextoActivo
+                ]}>
+                  Todas ({espaciosOriginales.length})
+                </RNText>
+              </TouchableOpacity>
+              
+              {ubicacionesFiltro.map((ubicacion) => {
+                const count = espaciosOriginales.filter(e => e.ubicacion === ubicacion).length;
+                return (
+                  <TouchableOpacity
+                    key={ubicacion}
+                    style={[
+                      styles.filtroUbicacion,
+                      ubicacionSeleccionadaFiltro === ubicacion && styles.filtroUbicacionActivo
+                    ]}
+                    onPress={() => handleFiltrarPorUbicacion(ubicacion)}
+                  >
+                    <RNText 
+                      style={[
+                        styles.filtroUbicacionTexto,
+                        ubicacionSeleccionadaFiltro === ubicacion && styles.filtroUbicacionTextoActivo
+                      ]}
+                      numberOfLines={1}
+                    >
+                      {ubicacion.length > 25 ? ubicacion.substring(0, 25) + '...' : ubicacion} ({count})
+                    </RNText>
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+          </View>
+        )}
+
         {loadingSpaces ? (
           <LoadingText>Cargando espacios disponibles...</LoadingText>
         ) : espaciosDisponibles.length === 0 ? (
@@ -718,7 +1073,16 @@ const RegistroManualScreen: React.FC = () => {
             >
               <ModalSpaceTitle>Espacio {espacio.numero}</ModalSpaceTitle>
               <ModalSpaceInfo>{espacio.ubicacion}</ModalSpaceInfo>
-              <ModalSpacePrice>${espacio.tarifaPorHora}/hora</ModalSpacePrice>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                <ModalSpacePrice>${espacio.tarifaPorHora}/hora</ModalSpacePrice>
+                {espacio.distancia !== undefined && (
+                  <RNText style={{ fontSize: 11, color: '#4CAF50', fontWeight: '600' }}>
+                    {espacio.distancia < 1 
+                      ? `${(espacio.distancia * 1000).toFixed(0)}m` 
+                      : `${espacio.distancia.toFixed(1)}km`}
+                  </RNText>
+                )}
+              </View>
             </ModalSpaceItem>
           ))
         )}
