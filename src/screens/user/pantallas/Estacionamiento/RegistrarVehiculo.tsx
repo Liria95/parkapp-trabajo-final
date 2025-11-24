@@ -29,7 +29,6 @@ export default function RegistrarVehiculo() {
     patente,
     setPatente,
     iniciarEstacionamiento,
-    configEstacionamiento,
   } = usuarioContext;
 
   const { state } = authContext;
@@ -50,10 +49,6 @@ export default function RegistrarVehiculo() {
   const cameraRef = useRef<CameraView>(null);
   
   const navigation = useNavigation<NativeStackNavigationProp<RutasStackParamList>>();
-
-  const ubicacion = espacioSeleccionado?.ubicacion || configEstacionamiento?.ubicacion || "Selecciona un espacio";
-  const tarifaHora = espacioSeleccionado?.tarifaPorHora || configEstacionamiento?.tarifaHora || 100;
-  const limite = configEstacionamiento?.limite || 2;
 
   // Función para buscar patente en el texto
   const findPatente = (text: string): string | null => {
@@ -141,16 +136,6 @@ export default function RegistrarVehiculo() {
   };
 
   useEffect(() => {
-    console.log('===== REGISTRAR VEHICULO =====');
-    console.log('User ID:', state.user?.id);
-    console.log('Espacio seleccionado:', espacioSeleccionado?.numero);
-    console.log('Ubicacion:', ubicacion);
-    console.log('Tarifa:', tarifaHora);
-    console.log('Saldo:', saldo);
-    console.log('================================');
-  }, [state, espacioSeleccionado, ubicacion, tarifaHora, saldo]);
-
-  useEffect(() => {
     obtenerUbicacionYCargarEspacios();
   }, []);
 
@@ -164,9 +149,7 @@ export default function RegistrarVehiculo() {
         return;
       }
 
-      console.log('Obteniendo ubicacion del usuario...');
       const location = await Location.getCurrentPositionAsync({});
-      console.log('Ubicacion obtenida:', location.coords);
       
       setUbicacionUsuario({
         latitude: location.coords.latitude,
@@ -190,7 +173,6 @@ export default function RegistrarVehiculo() {
       const token = state.token;
 
       if (!token) {
-        console.log('No hay token disponible');
         Alert.alert('Error', 'No hay sesion activa');
         return;
       }
@@ -265,7 +247,7 @@ export default function RegistrarVehiculo() {
       return;
     }
 
-    if (saldo < tarifaHora) {
+    if (saldo < espacioSeleccionado.tarifaPorHora) {
       setMostrarModalRecarga(true);
       return;
     }
@@ -282,7 +264,7 @@ export default function RegistrarVehiculo() {
         patente: patente.toUpperCase(),
         ubicacion: espacioSeleccionado.ubicacion,
         tarifaHora: espacioSeleccionado.tarifaPorHora,
-        limite,
+        limite: 2, // Límite por defecto, puedes hacerlo configurable
       },
       userId,
       espacioSeleccionado.id
@@ -322,7 +304,7 @@ export default function RegistrarVehiculo() {
         contentContainerStyle={{paddingBottom: 20}}
         showsVerticalScrollIndicator={true}
       >
-        {espaciosDisponibles.map((espacio, index) => (
+        {espaciosDisponibles.map((espacio) => (
           <TouchableOpacity
             key={espacio.id}
             style={[
@@ -361,7 +343,7 @@ export default function RegistrarVehiculo() {
       <Text style={styles.titulo}>REGISTRAR VEHICULO</Text>
 
       <ScrollView style={styles.contenedorCards} showsVerticalScrollIndicator={false}>
-        {/* Cámara - toca para capturar */}
+        {/* Cámara */}
         <TouchableOpacity 
           style={styles.tarjetaCamara}
           onPress={capturarYProcesar}
@@ -374,7 +356,6 @@ export default function RegistrarVehiculo() {
             facing="back" 
           />
           
-          {/* Overlay de procesamiento */}
           {isProcessing && (
             <View style={styles.processingOverlay}>
               <ActivityIndicator color="#fff" size="large" />
@@ -386,6 +367,7 @@ export default function RegistrarVehiculo() {
           </Text>
         </TouchableOpacity>
 
+        {/* Input de patente */}
         <View style={styles.inputContainer}>
           <Text style={styles.label}>Patente detectada:</Text>
           <TextInput
@@ -398,6 +380,7 @@ export default function RegistrarVehiculo() {
           />
         </View>
 
+        {/* Selector de espacio */}
         <TouchableOpacity 
           style={styles.selectorEspacio}
           onPress={handleAbrirModal}
@@ -406,7 +389,9 @@ export default function RegistrarVehiculo() {
             <View style={{flex: 1}}>
               <Text style={styles.selectorLabel}>Espacio seleccionado:</Text>
               <Text style={styles.selectorValor} numberOfLines={2}>
-                {espacioSeleccionado ? `${espacioSeleccionado.numero} - ${espacioSeleccionado.ubicacion}` : 'Toca aqui para seleccionar'}
+                {espacioSeleccionado 
+                  ? `${espacioSeleccionado.numero} - ${espacioSeleccionado.ubicacion}` 
+                  : 'Toca aqui para seleccionar'}
               </Text>
               <Text style={{fontSize: 10, color: theme.colors.gray, marginTop: 4}}>
                 ({espaciosDisponibles.length} espacios disponibles)
@@ -416,12 +401,16 @@ export default function RegistrarVehiculo() {
           </View>
         </TouchableOpacity>
 
-        <InfoEstacionamiento
-          ubicacion={ubicacion}
-          tarifa={`$${tarifaHora} POR HORA`}
-          limite={`${limite} HORAS`}
-        />
+        {/* Info de estacionamiento - solo si hay espacio seleccionado */}
+        {espacioSeleccionado && (
+          <InfoEstacionamiento
+            ubicacion={espacioSeleccionado.ubicacion}
+            tarifa={`$${espacioSeleccionado.tarifaPorHora} POR HORA`}
+            limite={`2 HORAS`}
+          />
+        )}
 
+        {/* Botón iniciar */}
         <BotonPrimSec
           titulo="Iniciar estacionamiento"
           tipo="relleno"
@@ -431,7 +420,7 @@ export default function RegistrarVehiculo() {
         />
       </ScrollView>
 
-      {/* Modal de seleccion de espacios */}
+      {/* Modal de espacios */}
       <Modal 
         visible={mostrarModalEspacios} 
         transparent 
@@ -455,7 +444,6 @@ export default function RegistrarVehiculo() {
                 <Ionicons name="close" size={28} color={theme.colors.dark} />
               </TouchableOpacity>
             </View>
-
             {renderModalContent()}
           </View>
         </View>
@@ -468,7 +456,7 @@ export default function RegistrarVehiculo() {
             <Text style={styles.modalTitulo}>Saldo insuficiente</Text>
             <Text style={styles.modalTexto}>
               Tu saldo actual: ${saldo.toFixed(2)}{'\n'}
-              Necesitas: ${tarifaHora} por hora{'\n\n'}
+              Necesitas: ${espacioSeleccionado?.tarifaPorHora || 0} por hora{'\n\n'}
               Recarga para poder estacionar tu vehiculo
             </Text>
             <BotonPrimSec

@@ -24,35 +24,49 @@ export default function EstacionamientoActivo() {
       </View>
     );
   }
-
-  const tiempoInicial = estacionamiento.limite * 60 * 60; // en segundos
+  
+  // Calcular segundos transcurridos desde el inicio
   const [segundosTranscurridos, setSegundosTranscurridos] = useState(
     Math.floor((Date.now() - new Date(estacionamiento.inicio).getTime()) / 1000)
   );
 
   useEffect(() => {
     const intervalo = setInterval(() => {
-      setSegundosTranscurridos((prev) => Math.min(prev + 1, tiempoInicial));
+      const ahora = Date.now();
+      const inicio = new Date(estacionamiento.inicio).getTime();
+      const transcurrido = Math.floor((ahora - inicio) / 1000);
+      setSegundosTranscurridos(transcurrido);
     }, 1000);
 
     return () => clearInterval(intervalo);
-  }, []);
+  }, [estacionamiento.inicio]);
+  
+  // Costo actual basado en el tiempo TRANSCURRIDO (proporcional)
+  const costoActual = (segundosTranscurridos / 3600) * estacionamiento.tarifaHora;
 
-  const tiempoRestante = Math.max(tiempoInicial - segundosTranscurridos, 0);
-  const costoActual = ((segundosTranscurridos / 3600) * estacionamiento.tarifaHora);
-
-  const horaVencimiento = new Date(estacionamiento.inicio.getTime() + tiempoInicial * 1000).toLocaleTimeString("es-AR", {
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-    timeZone: "America/Argentina/Buenos_Aires",
-  });
+  // Formatear tiempo transcurrido (HH:MM:SS)
+  const formatearTiempo = (segundos: number): string => {
+    const horas = Math.floor(segundos / 3600);
+    const minutos = Math.floor((segundos % 3600) / 60);
+    const segs = segundos % 60;
+    return `${horas.toString().padStart(2, '0')}:${minutos.toString().padStart(2, '0')}:${segs.toString().padStart(2, '0')}`;
+  };
 
   const handleFinalizar = () => {
-    setSaldo((prev) => prev - costoActual);
-    agregarMovimiento({ tipo: "Estacionamiento", monto: -costoActual });
+    const costoCalculadoLocal = (segundosTranscurridos / 3600) * estacionamiento.tarifaHora;
+    
+    console.log('=== DATOS ANTES DE FINALIZAR ===');
+    console.log('Tiempo transcurrido (segundos):', segundosTranscurridos);
+    console.log('Tiempo transcurrido (formato):', formatearTiempo(segundosTranscurridos));
+    console.log('Tarifa por hora:', estacionamiento.tarifaHora);
+    console.log('Costo calculado localmente:', costoCalculadoLocal.toFixed(2));
+    console.log('================================');
+    
+    // NO descontamos aquí, el backend lo hace
+    // Solo llamamos a finalizarEstacionamiento que actualiza todo desde el servidor
     finalizarEstacionamiento();
-    // FIX 1: Navegación sin parámetros
+    
+    // La navegación se hace después de que el backend responda
     navigation.navigate("Tabs");
   };
 
@@ -62,23 +76,38 @@ export default function EstacionamientoActivo() {
     <View style={styles.contenedor}>
       <Text style={styles.titulo}>ESTACIONAMIENTO ACTIVO</Text>
 
+      {/* Tiempo transcurrido (contador hacia adelante) */}
       <TarjetaGradiente 
         style={styles.tarjetaControl} 
-        colores={[theme.colors.secondary, theme.colors.success]}
+        colores={[theme.colors.primary, theme.colors.secondary]}
       >
-        <Text style={styles.textoGradiente}>
-          Tiempo restante: {new Date(tiempoRestante * 1000).toISOString().substr(11, 8)}
+        <Text style={styles.labelGradiente}>TIEMPO TRANSCURRIDO</Text>
+        <Text style={styles.textoGrandeGradiente}>
+          {formatearTiempo(segundosTranscurridos)}
         </Text>
-        <Text style={styles.textoGradiente}>Vence: {horaVencimiento} hs</Text>
       </TarjetaGradiente>
 
+      {/* Información del vehículo */}
       <View style={styles.cajaPunteada}>
         <Ionicons name="car-sport-outline" size={24} color={theme.colors.dark} />
         <Text style={styles.textoVehiculo}>
-          {estacionamiento.patente} - {estacionamiento.ubicacion}
+          {estacionamiento.patente}
+        </Text>
+        <Text style={styles.textoUbicacion}>
+          {estacionamiento.ubicacion}
         </Text>
       </View>
 
+      {/* Costo actual */}
+      <View style={styles.cajaPunteada}>
+        <Text style={styles.labelCosto}>COSTO ACTUAL</Text>
+        <Text style={styles.costoTexto}>${costoActual.toFixed(2)}</Text>
+        <Text style={styles.tarifaTexto}>
+          Tarifa: ${estacionamiento.tarifaHora}/hora
+        </Text>
+      </View>
+
+      {/* Botones */}
       <View style={styles.botones}>
         <BotonPrimSec
           titulo="EXTENDER"
@@ -94,7 +123,7 @@ export default function EstacionamientoActivo() {
         <BotonPrimSec
           titulo="FINALIZAR"
           tipo="relleno"
-          color={theme.colors.primary}
+          color={theme.colors.danger}
           estilo={{
             paddingHorizontal: 30,
             minWidth: 120,
@@ -104,30 +133,11 @@ export default function EstacionamientoActivo() {
         />
       </View>
 
-      <View style={styles.cajaPunteada}>
-        <Text style={styles.costoTexto}>COSTO ACTUAL: ${costoActual.toFixed(2)}</Text>
-      </View>
-
       <ModalExtender
         visible={mostrarModal}
         onClose={() => setMostrarModal(false)}
         onConfirm={(horas, minutos) => {
-          // FIX 2 y 3: Comentar código que usa setEstacionamiento (no existe en el contexto)
-          // Si necesitas extender el estacionamiento, debes agregar esta función al contexto
-          
-          /* 
-          const segundosExtra = horas * 3600 + minutos * 60;
-          const nuevoLimite = estacionamiento.limite + segundosExtra / 3600;
-
-          // Necesitas agregar setEstacionamiento al UsuarioContext
-          context.setEstacionamiento((prev: any) =>
-            prev ? { ...prev, limite: nuevoLimite } : null
-          );
-          */
-
           setMostrarModal(false);
-          
-          // Mientras tanto, solo muestra un mensaje
           console.log(`Extender estacionamiento: ${horas}h ${minutos}m`);
         }}
       />
@@ -142,7 +152,8 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.white,
   },
   tarjetaControl: {
-    marginVertical: 20,
+    marginVertical: 15,
+    padding: 20,
   },
   titulo: {
     fontSize: 18,
@@ -151,25 +162,31 @@ const styles = StyleSheet.create({
     marginBottom: 15,
     textAlign: "center",
   },
-  textoGradiente: {
-    marginTop: 10,
-    fontSize: 16,
+  labelGradiente: {
+    fontSize: 12,
+    color: theme.colors.white,
+    textAlign: "center",
+    opacity: 0.8,
+    marginBottom: 5,
+  },
+  textoGrandeGradiente: {
+    fontSize: 42,
     color: theme.colors.white,
     fontWeight: "bold",
     textAlign: "center",
-    marginVertical: 5,
-  },
-  infoVehiculo: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginVertical: 10,
-    justifyContent: "center",
+    fontVariant: ['tabular-nums'],
   },
   textoVehiculo: {
-    fontSize: 16,
-    marginLeft: 10,
+    fontSize: 20,
+    marginTop: 8,
     color: theme.colors.dark,
     fontWeight: "bold",
+    letterSpacing: 2,
+  },
+  textoUbicacion: {
+    fontSize: 14,
+    marginTop: 5,
+    color: theme.colors.gray,
   },
   botones: {
     flexDirection: "row",
@@ -177,25 +194,28 @@ const styles = StyleSheet.create({
     width: "100%",
     marginVertical: 10,
   },
-  costoBox: {
-    backgroundColor: theme.colors.white,
-    padding: 15,
-    borderRadius: 15,
-    alignItems: "center",
-    borderStyle: "dashed",
+  labelCosto: {
+    fontSize: 12,
+    color: theme.colors.gray,
+    marginBottom: 5,
   },
   costoTexto: {
-    fontSize: 16,
+    fontSize: 32,
     fontWeight: "bold",
-    color: theme.colors.dark,
+    color: theme.colors.primary,
+  },
+  tarifaTexto: {
+    fontSize: 12,
+    color: theme.colors.gray,
+    marginTop: 5,
   },
   cajaPunteada: {
-    borderWidth: 1,
-    borderColor: theme.colors.dark,
+    borderWidth: 2,
+    borderColor: theme.colors.gray,
     borderStyle: "dashed",
     borderRadius: 12,
-    padding: 12,
-    marginVertical: 20,
+    padding: 15,
+    marginVertical: 10,
     alignItems: "center",
   },
 });

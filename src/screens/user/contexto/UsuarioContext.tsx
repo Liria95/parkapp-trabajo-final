@@ -378,7 +378,7 @@ export const UsuarioProvider = ({ children }: UsuarioProviderProps) => {
 
         agregarMovimiento({ 
           tipo: "Estacionamiento", 
-          monto: -result.totalCost 
+          monto: result.totalCost 
         });
 
         setEstacionamiento(null);
@@ -419,7 +419,7 @@ export const UsuarioProvider = ({ children }: UsuarioProviderProps) => {
     }
   };
 
-  const actualizarSaldoEstacionamiento = () => {
+  /* const actualizarSaldoEstacionamiento = () => {
     if (!estacionamiento || !estacionamiento.activo) return;
 
     const tiempoTranscurrido = Math.floor(
@@ -438,7 +438,7 @@ export const UsuarioProvider = ({ children }: UsuarioProviderProps) => {
     setEstacionamiento((prev) =>
       prev ? { ...prev, costoAcumulado: costoActual } : null
     );
-  };
+  }; */
 
   const limpiarDatos = async () => {
     console.log('Limpiando datos del usuario...');
@@ -471,7 +471,7 @@ export const UsuarioProvider = ({ children }: UsuarioProviderProps) => {
         finalizarEstacionamiento,
         configEstacionamiento,
         actualizarConfigEstacionamiento: setConfigEstacionamiento,
-        actualizarSaldoEstacionamiento,
+        actualizarSaldoEstacionamiento: () => {},
         limpiarDatos,
         sincronizarSaldoConServidor,
       }}
