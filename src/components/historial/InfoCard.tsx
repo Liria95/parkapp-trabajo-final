@@ -5,7 +5,7 @@ import { theme } from '../../config/theme' ;
 interface InfoCardProps {
   label: string;
   value: string | number;
-  trend?: string; // opcional
+  trend?: string | null; // ✅ Ahora acepta null también
   backgroundColor?: string;
 }
 

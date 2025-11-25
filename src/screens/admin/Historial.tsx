@@ -185,35 +185,37 @@ export default function Historial() {
     cargarDatos();
   };
 
+  // FIX: Eliminar cálculo de trend incorrecto
+  // Ya no tiene sentido calcular "trend" porque no hay datos de comparación
   const historyStats = [
     {
       id: 'yesterday-occupancy',
-      label: 'Ocupación Ayer',
-      value: historyData.yesterday.users > 0 ? `${historyData.yesterday.users}` : '-',
-      trend: stats ? `${((historyData.yesterday.users - stats.activeUsers) / stats.activeUsers * 100).toFixed(0)}%` : '0%',
+      label: 'Usuarios Activos Ayer',
+      value: historyData.yesterday.users > 0 ? `${historyData.yesterday.users}` : '0',
+      trend: null, // Sin trend
     },
     {
       id: 'yesterday-revenue',
       label: 'Ingresos Ayer',
       value: historyData.yesterday.revenue > 0 ? `$${historyData.yesterday.revenue.toFixed(0)}` : '$0',
-      trend: stats ? `${((historyData.yesterday.revenue - parseFloat(stats.totalBalance)) / parseFloat(stats.totalBalance) * 100).toFixed(0)}%` : '0%',
+      trend: null, // Sin trend
     },
     {
       id: 'last-week-occupancy',
-      label: 'Ocupación Semana Pasada',
-      value: historyData.lastWeek.users > 0 ? `${historyData.lastWeek.users}` : '-',
-      trend: stats ? `${((historyData.lastWeek.users - stats.activeUsers) / stats.activeUsers * 100).toFixed(0)}%` : '0%',
+      label: 'Usuarios Activos Semana Pasada',
+      value: historyData.lastWeek.users > 0 ? `${historyData.lastWeek.users}` : '0',
+      trend: null, // Sin trend
     },
     {
       id: 'last-week-revenue',
       label: 'Ingresos Semana Pasada',
       value: historyData.lastWeek.revenue > 0 ? `$${historyData.lastWeek.revenue.toFixed(0)}` : '$0',
-      trend: stats ? `${((historyData.lastWeek.revenue - parseFloat(stats.totalBalance)) / parseFloat(stats.totalBalance) * 100).toFixed(0)}%` : '0%',
+      trend: null, // Sin trend
     },
   ];
 
   const getCardColor = (label: string) => {
-    if (label.includes('Ocupación')){
+    if (label.includes('Usuarios')){
       return theme.colors.primary;
     }
     if (label.includes('Ingresos')){
@@ -226,13 +228,13 @@ export default function Historial() {
     {
       id: 'ocupacion',
       number: stats.occupiedSpaces || 0,
-      label: 'Ocupación Actual',
+      label: 'Espacios Ocupados',
       backgroundColor: theme.colors.primary,
     },
     {
       id: 'ingresos',
       number: `$${stats.totalBalance}`,
-      label: 'Ingresos Hoy',
+      label: 'Saldo Total Sistema',
       backgroundColor: theme.colors.success,
     },
     {
@@ -299,7 +301,7 @@ export default function Historial() {
         </View>
       </View>
 
-      <Text style={styles.sectionTitle}>Usuarios HOY</Text>
+      <Text style={styles.sectionTitle}>Usuarios Registrados</Text>
       
       {usuarios.length === 0 ? (
         <View style={{ padding: 20, alignItems: 'center' }}>

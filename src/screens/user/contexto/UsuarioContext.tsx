@@ -209,7 +209,7 @@ export const UsuarioProvider = ({ children }: UsuarioProviderProps) => {
         return null;
       }
 
-      console.log('Buscando sesión activa en el backend...');
+      console.log('Buscando sesion activa en el backend...');
 
       const response = await fetch(`${API_BASE_URL}/parking-sessions/active`, {
         method: 'GET',
@@ -222,12 +222,12 @@ export const UsuarioProvider = ({ children }: UsuarioProviderProps) => {
       const result = await response.json();
 
       if (result.success && result.hasActiveSession) {
-        console.log('Sesión activa encontrada:', result.session.id);
+        console.log('Sesion activa encontrada:', result.session.id);
         await AsyncStorage.setItem('sessionId', result.session.id);
         return result.session.id;
       }
 
-      console.log('No hay sesión activa en el backend');
+      console.log('No hay sesion activa en el backend');
       return null;
 
     } catch (error) {
@@ -255,7 +255,7 @@ export const UsuarioProvider = ({ children }: UsuarioProviderProps) => {
     }
 
     try {
-      console.log('Llamando al backend para iniciar sesión...');
+      console.log('Llamando al backend para iniciar sesion...');
 
       const response = await fetch(`${API_BASE_URL}/parking-sessions/start`, {
         method: 'POST',
@@ -274,7 +274,7 @@ export const UsuarioProvider = ({ children }: UsuarioProviderProps) => {
       console.log('Respuesta del backend:', result);
 
       if (result.success) {
-        console.log('Sesión creada con ID:', result.sessionId);
+        console.log('Sesion creada con ID:', result.sessionId);
 
         const nuevoEstacionamiento: Estacionamiento = {
           activo: true,
@@ -314,19 +314,19 @@ export const UsuarioProvider = ({ children }: UsuarioProviderProps) => {
             null
           );
 
-          console.log("Notificación enviada");
+          console.log("Notificacion enviada");
         } catch (error) {
-          console.error("Error al enviar notificación:", error);
+          console.error("Error al enviar notificacion:", error);
         }
 
       } else {
-        console.log('Error al iniciar sesión:', result.message);
+        console.log('Error al iniciar sesion:', result.message);
         Alert.alert('Error', result.message || 'No se pudo iniciar el estacionamiento');
       }
 
     } catch (error) {
       console.error('Error al iniciar estacionamiento:', error);
-      Alert.alert('Error', 'Ocurrió un error al iniciar el estacionamiento');
+      Alert.alert('Error', 'Ocurrio un error al iniciar el estacionamiento');
     }
   };
 
@@ -344,20 +344,24 @@ export const UsuarioProvider = ({ children }: UsuarioProviderProps) => {
 
     if (!token || !userId) {
       console.log('No hay token o userId');
-      Alert.alert('Error', 'No hay sesión activa');
+      Alert.alert('Error', 'No hay sesion activa');
       return;
     }
 
     const sessionId = await getSessionId(userId);
 
     if (!sessionId) {
-      console.log('No se encontró sessionId');
-      Alert.alert('Error', 'No se pudo obtener la sesión de estacionamiento');
+      console.log('No se encontro sessionId');
+      Alert.alert('Error', 'No se pudo obtener la sesion de estacionamiento');
+      // LIMPIAR IGUAL aunque no haya sessionId
+      await AsyncStorage.removeItem('sessionId');
+      await AsyncStorage.removeItem('estacionamientoActivo');
+      setEstacionamiento(null);
       return;
     }
 
     try {
-      console.log('Llamando al backend para finalizar sesión:', sessionId);
+      console.log('Llamando al backend para finalizar sesion:', sessionId);
 
       const response = await fetch(`${API_BASE_URL}/parking-sessions/end`, {
         method: 'POST',
@@ -381,20 +385,12 @@ export const UsuarioProvider = ({ children }: UsuarioProviderProps) => {
 
         agregarMovimiento({ 
           tipo: "Estacionamiento", 
-          monto: -result.totalCost 
+          monto: result.totalCost 
         });
-
-        setEstacionamiento(null);
-
-        await AsyncStorage.removeItem('sessionId');
-
-        setTimeout(() => {
-          sincronizarSaldoConServidor();
-        }, 1000);
 
         Alert.alert(
           'Estacionamiento finalizado',
-          `Duración: ${result.duration} hora(s)\n` +
+          `Duracion: ${result.duration} hora(s)\n` +
           `Costo: $${result.totalCost}\n` +
           `Nuevo saldo: $${result.newBalance}`,
           [{ text: 'OK' }]
@@ -406,9 +402,9 @@ export const UsuarioProvider = ({ children }: UsuarioProviderProps) => {
             estacionamiento.ubicacion,
             result.totalCost
           );
-          console.log('Notificación de finalización enviada');
+          console.log('Notificacion de finalizacion enviada');
         } catch (notifError) {
-          console.error('Error al enviar notificación:', notifError);
+          console.error('Error al enviar notificacion:', notifError);
         }
 
       } else {
@@ -418,29 +414,20 @@ export const UsuarioProvider = ({ children }: UsuarioProviderProps) => {
 
     } catch (error) {
       console.error('Error al finalizar estacionamiento:', error);
-      Alert.alert('Error', 'Ocurrió un error al finalizar el estacionamiento');
+      Alert.alert('Error', 'Ocurrio un error al finalizar el estacionamiento');
+    } finally {
+      // SIEMPRE LIMPIAR, incluso si hay error
+      // Esto previene que quede un sessionId viejo guardado
+      console.log('Limpiando estacionamiento local (finally)...');
+      setEstacionamiento(null);
+      await AsyncStorage.removeItem('sessionId');
+      await AsyncStorage.removeItem('estacionamientoActivo');
+      
+      // Sincronizar con servidor para obtener el saldo real
+      setTimeout(() => {
+        sincronizarSaldoConServidor();
+      }, 1000);
     }
-  };
-
-  const actualizarSaldoEstacionamiento = () => {
-    if (!estacionamiento || !estacionamiento.activo) return;
-
-    const tiempoTranscurrido = Math.floor(
-      (Date.now() - new Date(estacionamiento.inicio).getTime()) / 1000
-    );
-    const costoActual = (tiempoTranscurrido / 3600) * estacionamiento.tarifaHora;
-
-    const costoPrevio = estacionamiento.costoAcumulado ?? 0;
-    const diferencia = costoActual - costoPrevio;
-
-    if (diferencia <= 0) return;
-
-    setSaldo((prev) => Math.max(prev - diferencia, 0));
-    agregarMovimiento({ tipo: "Estacionamiento", monto: -diferencia });
-
-    setEstacionamiento((prev) =>
-      prev ? { ...prev, costoAcumulado: costoActual } : null
-    );
   };
 
   const limpiarDatos = async () => {
@@ -475,7 +462,7 @@ export const UsuarioProvider = ({ children }: UsuarioProviderProps) => {
         finalizarEstacionamiento,
         configEstacionamiento,
         actualizarConfigEstacionamiento: setConfigEstacionamiento,
-        actualizarSaldoEstacionamiento,
+        actualizarSaldoEstacionamiento: () => {},
         limpiarDatos,
         sincronizarSaldoConServidor,
         parkingLocationAddress,

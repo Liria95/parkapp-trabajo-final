@@ -22,7 +22,7 @@ export default function Perfil() {
   const nombreCompleto = `${usuario.nombre} ${usuario.apellido}`.trim();
 
   const opcionesMenu = [
-    { id: 1, titulo: "Mis vehículos", icono: "car-sport" as const, screen: null },
+    { id: 1, titulo: "Mis vehículos", icono: "car-sport", screen: "MisVehiculos" },
     { id: 2, titulo: "Notificaciones", icono: "notifications" as const, screen: 'NotificationsScreen' },
     { id: 3, titulo: "Infracciones pendientes", icono: "warning" as const, screen: 'InfraccionesPendientes' },
     { id: 4, titulo: "Configuración", icono: "settings" as const, screen: 'Configuracion' },

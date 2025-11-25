@@ -1,11 +1,13 @@
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import NavegadorTabs from "./NavegadorTabs";
 import PantallaEstacionamientoActivo from "../pantallas/Estacionamiento/EstacionamientoActivo";
+
 import InfraccionesPendientes from "../pantallas/perfilUser/infraccionesPendientes";
 import NotificationsScreen from "../pantallas/perfilUser/NotificationsScreen";
 import Configuracion from "../pantallas/perfilUser/Configuracion";
 import EditarPerfil from "../pantallas/perfilUser/EditarPerfil";
 import EliminarCuenta from "../pantallas/perfilUser/EliminarCuenta";
+import MisVehiculos from "../pantallas/perfilUser/MisVehiculos";
 
 const Stack = createNativeStackNavigator();
 
@@ -49,6 +51,11 @@ export default function NavegadorPrincipal() {
       <Stack.Screen
         name="EliminarCuenta"
         component={EliminarCuenta}
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen
+        name="MisVehiculos"
+        component={MisVehiculos}
         options={{ headerShown: false }}
       />
     </Stack.Navigator>

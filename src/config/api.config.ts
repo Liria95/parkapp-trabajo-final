@@ -1,6 +1,6 @@
 export const API_CONFIG = {
   BASE_URL: 'http://192.168.1.6:3000',
-  
+
   ENDPOINTS: {
     PAYMENTS: '/api/payments',
     AUTH: '/api/auth',
@@ -10,8 +10,9 @@ export const API_CONFIG = {
     MANUAL_REGISTRATION: '/api/manual-registration',
     PARKING_SPACES: '/api/parking-spaces',
     PARKING_SESSIONS: '/api/parking-sessions',
+    VEHICLES: '/api/vehicles',
   },
-  
+
   TIMEOUT: 10000,
 };
 
@@ -24,4 +25,5 @@ export const API_URLS = {
   MANUAL_REGISTRATION: `${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.MANUAL_REGISTRATION}`,
   PARKING_SPACES: `${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.PARKING_SPACES}`,
   PARKING_SESSIONS: `${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.PARKING_SESSIONS}`,
+  VEHICLES: `${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.VEHICLES}`,
 };

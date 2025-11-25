@@ -1,5 +1,5 @@
 import React, { useState, useContext, useEffect } from 'react';
-import { ScrollView, Alert, ActivityIndicator, Text } from 'react-native';
+import { ScrollView, Alert, ActivityIndicator, Text, View } from 'react-native';
 import styled from 'styled-components/native';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -12,6 +12,7 @@ import SectionCard from '../../components/dashboard/SectionCard';
 import ChartPlaceholder from '../../components/dashboard/ChartPlaceholder';
 import UserList from '../../components/dashboard/UserList';
 import BottomTabNavigation from '../../components/navigation/BottomTabNavigation';
+import MapaAdmin from './MapaAdmin';
 
 // Servicios
 import { AdminUserService } from '../../services/AdminUserService';
@@ -59,6 +60,13 @@ const LoadingContainer = styled.View`
   flex: 1;
   justify-content: center;
   align-items: center;
+`;
+
+// ✅ Contenedor para el mapa con altura fija
+const MapContainer = styled.View`
+  height: 300px;
+  border-radius: 12px;
+  overflow: hidden;
 `;
 
 const AdminDashboard: React.FC = () => {
@@ -365,11 +373,12 @@ const AdminDashboard: React.FC = () => {
         contentContainerStyle={{ flexGrow: 1 }}
       >
         <StatsGrid stats={statsConfig} />
-        <SectionCard title="Gráfico de ocupación">
-          <ChartPlaceholder
-            iconName="bar-chart-outline"
-            title="Actividad en Tiempo Real"
-          />
+        
+        {/* ✅ MAPA ADMIN (sin UsuarioContext) */}
+        <SectionCard title="Mapa de Ocupación en Tiempo Real">
+          <MapContainer>
+            <MapaAdmin showUserLocation={false} />
+          </MapContainer>
         </SectionCard>
 
         <SectionCard

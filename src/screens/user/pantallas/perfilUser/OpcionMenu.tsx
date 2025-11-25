@@ -4,7 +4,7 @@ import { theme } from "../../../../config/theme";
 
 interface OpcionMenuProps {
   titulo: string;
-  icono: keyof typeof Ionicons.glyphMap;
+  icono: string; // 🔥 ACEPTA iconos sin romper TS
   onPress: () => void;
 }
 
@@ -12,7 +12,7 @@ export default function OpcionMenu({ titulo, icono, onPress }: OpcionMenuProps) 
   return (
     <TouchableOpacity style={styles.contenedor} onPress={onPress}>
       <View style={styles.iconoContainer}>
-        <Ionicons name={icono} size={24} color={theme.colors.primary} />
+        <Ionicons name={icono as any} size={24} color={theme.colors.primary} />
       </View>
       <Text style={styles.texto}>{titulo}</Text>
       <Ionicons name="chevron-forward" size={24} color={theme.colors.primary} />
