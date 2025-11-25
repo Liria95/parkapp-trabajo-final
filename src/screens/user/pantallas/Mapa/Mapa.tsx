@@ -44,7 +44,7 @@ export default function Mapa() {
 
   const mapRef = useRef<MapView>(null);
 
-  // Campo Grande, Misiones, Argentina - ubicación por defecto
+  // Campo Grande, Misiones, Argentina - ubicacion por defecto
   const [region, setRegion] = useState<LocationType>({
     latitude: -27.4331,
     longitude: -55.5384,
@@ -53,12 +53,12 @@ export default function Mapa() {
   });
 
   const [userLocation, setUserLocation] = useState<LocationType | null>(null);
-  const [currentAddress, setCurrentAddress] = useState("Obteniendo dirección...");
+  const [currentAddress, setCurrentAddress] = useState("Obteniendo direccion...");
   const [parkingSpaces, setParkingSpaces] = useState<ParkingSpace[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
-  // Traduce coordenadas a dirección
+  // Traduce coordenadas a direccion
   const fetchAddressFromCoords = async (latitude: number, longitude: number) => {
     try {
       const addressArray = await Location.reverseGeocodeAsync({ latitude, longitude });
@@ -72,24 +72,24 @@ export default function Mapa() {
           setParkingLocationAddress(formattedAddress);
         }
       } else {
-        setCurrentAddress("Dirección no encontrada.");
+        setCurrentAddress("Direccion no encontrada.");
       }
     } catch (error) {
-      console.error("Error al obtener la dirección:", error);
-      setCurrentAddress("Error de servicio de Geocodificación.");
+      console.error("Error al obtener la direccion:", error);
+      setCurrentAddress("Error de servicio de Geocodificacion.");
     }
   };
 
-  // Obtener ubicación del usuario
+  // Obtener ubicacion del usuario
   const fetchLocation = async () => {
     try {
       const { status } = await Location.requestForegroundPermissionsAsync();
 
       if (status !== 'granted') {
-        console.log('Permiso de ubicación denegado. Usando ubicación por defecto.');
+        console.log('Permiso de ubicacion denegado. Usando ubicacion por defecto.');
         Alert.alert(
-          'Ubicación',
-          'Para ver espacios cercanos, permite el acceso a la ubicación.',
+          'Ubicacion',
+          'Para ver espacios cercanos, permite el acceso a la ubicacion.',
           [{ text: 'OK' }]
         );
         return;
@@ -109,15 +109,15 @@ export default function Mapa() {
       setUserLocation(newRegion);
       setRegion(newRegion);
 
-      // Centrar mapa en ubicación del usuario
+      // Centrar mapa en ubicacion del usuario
       if (mapRef.current) {
         mapRef.current.animateToRegion(newRegion, 1000);
       }
 
       fetchAddressFromCoords(location.coords.latitude, location.coords.longitude);
     } catch (error) {
-      console.error("Error al obtener la ubicación:", error);
-      Alert.alert('Error', 'No se pudo obtener tu ubicación');
+      console.error("Error al obtener la ubicacion:", error);
+      Alert.alert('Error', 'No se pudo obtener tu ubicacion');
     }
   };
 
@@ -136,9 +136,9 @@ export default function Mapa() {
         setLoading(true);
       }
 
-      console.log('🚗 Cargando espacios de estacionamiento...');
+      console.log('Cargando espacios de estacionamiento...');
 
-      // Obtener espacios con filtro de ubicación si está disponible
+      // Obtener espacios con filtro de ubicacion si esta disponible
       const locationFilter = userLocation ? {
         latitude: userLocation.latitude,
         longitude: userLocation.longitude,
@@ -151,10 +151,10 @@ export default function Mapa() {
       );
 
       if (result.success && result.espacios) {
-        console.log(`✅ ${result.espacios.length} espacios cargados`);
+        console.log(`${result.espacios.length} espacios cargados`);
         setParkingSpaces(result.espacios as ParkingSpace[]);
       } else {
-        console.log('❌ Error al cargar espacios:', result.message);
+        console.log('Error al cargar espacios:', result.message);
       }
     } catch (error) {
       console.error('Error al cargar espacios:', error);
@@ -164,17 +164,7 @@ export default function Mapa() {
     }
   };
 
-  // Auto-refresh cada 15 segundos
-  useEffect(() => {
-    const interval = setInterval(() => {
-      console.log('🔄 Auto-refrescando espacios...');
-      cargarEspacios(true);
-    }, 15000);
-
-    return () => clearInterval(interval);
-  }, [userLocation]);
-
-  // Cargar ubicación y espacios al iniciar
+  // Cargar ubicacion y espacios al iniciar
   useEffect(() => {
     const init = async () => {
       await fetchLocation();
@@ -183,7 +173,7 @@ export default function Mapa() {
     init();
   }, []);
 
-  // Obtener color del marcador según estado
+  // Obtener color del marcador segun estado
   const getMarkerColor = (status: string) => {
     switch (status) {
       case 'available':
@@ -225,22 +215,22 @@ export default function Mapa() {
     saldoRestante = Math.max(saldo - costoActual, 0);
   }
 
-  // Manejar selección de espacio
+  // Manejar seleccion de espacio
   const handleSpaceSelect = (space: ParkingSpace) => {
     Alert.alert(
       `Espacio ${space.numero}`,
-      `Ubicación: ${space.ubicacion}\nEstado: ${getStatusText(space.status)}\nTarifa: $${space.tarifaPorHora}/hora${space.distancia ? `\nDistancia: ${(space.distancia).toFixed(0)}m` : ''}`,
+      `Ubicacion: ${space.ubicacion}\nEstado: ${getStatusText(space.status)}\nTarifa: $${space.tarifaPorHora}/hora${space.distancia ? `\nDistancia: ${(space.distancia).toFixed(0)}m` : ''}`,
       [
         { text: 'Cerrar', style: 'cancel' },
         space.status === 'available' ? {
-          text: 'Estacionar aquí',
+          text: 'Estacionar aqui',
           onPress: () => console.log('Iniciar estacionamiento:', space.id)
         } : undefined
       ].filter(Boolean) as any
     );
   };
 
-  // Centrar mapa en mi ubicación
+  // Centrar mapa en mi ubicacion
   const centerOnUser = () => {
     if (userLocation && mapRef.current) {
       mapRef.current.animateToRegion(userLocation, 1000);
@@ -258,7 +248,6 @@ export default function Mapa() {
       <Text style={styles.titulo}>MAPA DE ESTACIONAMIENTO</Text>
 
       <View style={styles.contenedorCards}>
-        {/* Tarjeta de saldo */}
         <TarjetaGradiente colores={[theme.colors.secondary, theme.colors.success]}>
           <View style={styles.cardSaldo}>
             <Text style={styles.textoSaldo}>SALDO DISPONIBLE:</Text>
@@ -276,7 +265,6 @@ export default function Mapa() {
           </View>
         </TarjetaGradiente>
 
-        {/* Tarjeta del mapa interactivo */}
         <LinearGradient
           colors={[theme.colors.secondary, theme.colors.success]}
           style={styles.contCardMapa}
@@ -297,15 +285,14 @@ export default function Mapa() {
                 showsMyLocationButton={false}
                 toolbarEnabled={false}
               >
-                {/* Marcador de ubicación del usuario */}
                 {userLocation && (
                   <Marker
                     coordinate={{
                       latitude: userLocation.latitude,
                       longitude: userLocation.longitude,
                     }}
-                    title="Estás Aquí"
-                    description="Tu ubicación actual"
+                    title="Estas Aqui"
+                    description="Tu ubicacion actual"
                   >
                     <View style={styles.userMarker}>
                       <Ionicons name="person" size={20} color={theme.colors.white} />
@@ -313,7 +300,6 @@ export default function Mapa() {
                   </Marker>
                 )}
 
-                {/* Marcadores de espacios de estacionamiento */}
                 {parkingSpaces.map((space) => (
                   <Marker
                     key={space.id}
@@ -342,7 +328,6 @@ export default function Mapa() {
                 ))}
               </MapView>
 
-              {/* Botones flotantes */}
               <View style={styles.floatingButtons}>
                 <TouchableOpacity
                   style={styles.floatingButton}
@@ -375,7 +360,6 @@ export default function Mapa() {
           </View>
         </LinearGradient>
 
-        {/* Leyenda de colores */}
         <View style={styles.legend}>
           <View style={styles.legendItem}>
             <View style={[styles.legendColor, { backgroundColor: theme.colors.success }]} />
@@ -391,7 +375,6 @@ export default function Mapa() {
           </View>
         </View>
 
-        {/* Botón buscar zona */}
         <BotonPrimSec
           titulo="Actualizar espacios"
           tipo="borde"

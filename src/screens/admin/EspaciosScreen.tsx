@@ -1,4 +1,4 @@
-import React, { useState, useContext, useEffect } from 'react';
+import React, { useState, useContext } from 'react';
 import { Alert, ActivityIndicator, ScrollView, RefreshControl } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -99,25 +99,10 @@ const EspaciosScreen: React.FC = () => {
   const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
   const [sesionesActivas, setSesionesActivas] = useState<Map<string, any>>(new Map());
 
-  // Auto-refresh cada 5 segundos
-  useEffect(() => {
-    console.log('🔄 Iniciando auto-refresh cada 5 segundos...');
-    
-    const interval = setInterval(() => {
-      console.log('🔄 Auto-refrescando espacios...');
-      cargarEspacios(true);
-    }, 5000);
-
-    return () => {
-      console.log('🛑 Deteniendo auto-refresh');
-      clearInterval(interval);
-    };
-  }, []);
-
   // Cargar al entrar a la pantalla
   useFocusEffect(
     React.useCallback(() => {
-      console.log('👁️ Pantalla enfocada - Cargando espacios');
+      console.log('Pantalla enfocada - Cargando espacios');
       cargarEspacios();
     }, [])
   );
@@ -141,24 +126,24 @@ const EspaciosScreen: React.FC = () => {
   };
 
   // Cargar espacios y sesiones activas
-  const cargarEspacios = async (isAutoRefresh: boolean = false) => {
+  const cargarEspacios = async (isManualRefresh: boolean = false) => {
     const token = authContext?.state.token;
 
     if (!token) {
-      if (!isAutoRefresh) {
-        Alert.alert('Error', 'No hay token de autenticación');
+      if (!isManualRefresh) {
+        Alert.alert('Error', 'No hay token de autenticacion');
       }
       setLoading(false);
       return;
     }
 
     try {
-      if (!isAutoRefresh && espacios.length === 0 && !refreshing) {
+      if (!isManualRefresh && espacios.length === 0 && !refreshing) {
         setLoading(true);
       }
       
-      if (!isAutoRefresh) {
-        console.log('📍 Cargando espacios de estacionamiento...');
+      if (!isManualRefresh) {
+        console.log('Cargando espacios de estacionamiento...');
       }
 
       // Cargar espacios
@@ -168,8 +153,8 @@ const EspaciosScreen: React.FC = () => {
       const resultStats = await ParkingSessionService.getStats(token);
 
       if (resultEspacios.success && resultEspacios.spaces) {
-        if (!isAutoRefresh) {
-          console.log('✅ Espacios cargados:', resultEspacios.spaces.length);
+        if (!isManualRefresh) {
+          console.log('Espacios cargados:', resultEspacios.spaces.length);
         }
 
         // Crear mapa de sesiones activas por spaceCode
@@ -208,15 +193,15 @@ const EspaciosScreen: React.FC = () => {
         setEspacios(espaciosFormateados);
         setLastUpdate(new Date());
       } else {
-        if (!isAutoRefresh) {
-          console.log('❌ Error al cargar espacios:', resultEspacios.message);
+        if (!isManualRefresh) {
+          console.log('Error al cargar espacios:', resultEspacios.message);
           Alert.alert('Error', resultEspacios.message || 'No se pudieron cargar los espacios');
         }
       }
     } catch (error) {
-      if (!isAutoRefresh) {
-        console.error('❌ Error al cargar espacios:', error);
-        Alert.alert('Error', 'Ocurrió un error al cargar los espacios');
+      if (!isManualRefresh) {
+        console.error('Error al cargar espacios:', error);
+        Alert.alert('Error', 'Ocurrio un error al cargar los espacios');
       }
     } finally {
       setLoading(false);
@@ -235,7 +220,7 @@ const EspaciosScreen: React.FC = () => {
     return `${hours}h ${minutes}m`;
   };
 
-  // Formatear tiempo desde última actualización
+  // Formatear tiempo desde ultima actualizacion
   const getTimeSinceUpdate = (): string => {
     const now = new Date();
     const diffMs = now.getTime() - lastUpdate.getTime();
@@ -264,14 +249,14 @@ const EspaciosScreen: React.FC = () => {
       );
 
       if (result.success) {
-        Alert.alert('Éxito', result.message || 'Estado actualizado');
+        Alert.alert('Exito', result.message || 'Estado actualizado');
         cargarEspacios();
       } else {
         Alert.alert('Error', result.message || 'No se pudo actualizar el estado');
       }
     } catch (error) {
       console.error('Error al actualizar estado:', error);
-      Alert.alert('Error', 'Ocurrió un error al actualizar el estado');
+      Alert.alert('Error', 'Ocurrio un error al actualizar el estado');
     }
   };
 
@@ -281,13 +266,13 @@ const EspaciosScreen: React.FC = () => {
     if (!token) return;
 
     if (!espacio.vehiculoActual?.sessionId) {
-      Alert.alert('Error', 'No se encontró la sesión activa');
+      Alert.alert('Error', 'No se encontro la sesion activa');
       return;
     }
 
     Alert.alert(
-      'Confirmar finalización',
-      `¿Finalizar estacionamiento de ${espacio.vehiculoActual.patente}?`,
+      'Confirmar finalizacion',
+      `Finalizar estacionamiento de ${espacio.vehiculoActual.patente}?`,
       [
         { text: 'Cancelar', style: 'cancel' },
         {
@@ -303,7 +288,7 @@ const EspaciosScreen: React.FC = () => {
               if (result.success) {
                 Alert.alert(
                   'Estacionamiento finalizado',
-                  `Duración: ${Math.floor(result.duration! / 60)} min\nCosto: $${result.totalCost?.toFixed(2)}`,
+                  `Duracion: ${Math.floor(result.duration! / 60)} min\nCosto: $${result.totalCost?.toFixed(2)}`,
                   [{ text: 'OK', onPress: () => cargarEspacios() }]
                 );
               } else {
@@ -311,7 +296,7 @@ const EspaciosScreen: React.FC = () => {
               }
             } catch (error) {
               console.error('Error al finalizar:', error);
-              Alert.alert('Error', 'Ocurrió un error al finalizar');
+              Alert.alert('Error', 'Ocurrio un error al finalizar');
             }
           }
         }
@@ -319,7 +304,7 @@ const EspaciosScreen: React.FC = () => {
     );
   };
 
-  // Estadísticas calculadas
+  // Estadisticas calculadas
   const stats = {
     total: espacios.length,
     libre: espacios.filter(e => e.estado === 'libre').length,
@@ -327,7 +312,7 @@ const EspaciosScreen: React.FC = () => {
     mantenimiento: espacios.filter(e => e.estado === 'mantenimiento').length,
   };
 
-  // Configuración de estadísticas
+  // Configuracion de estadisticas
   const statsConfig = [
     {
       id: 'libre',
@@ -355,7 +340,7 @@ const EspaciosScreen: React.FC = () => {
     },
   ];
 
-  // Configuración de filtros
+  // Configuracion de filtros
   const filtros = [
     { id: 'todos', label: 'Todos' },
     { id: 'libre', label: 'Libre' },
@@ -390,7 +375,7 @@ const EspaciosScreen: React.FC = () => {
           onPress: () => finalizarEstacionamiento(espacio)
         },
         {
-          text: 'Crear Infracción',
+          text: 'Crear Infraccion',
           onPress: () => navigation.navigate('Infracciones')
         },
         {
@@ -447,7 +432,7 @@ const EspaciosScreen: React.FC = () => {
 
     Alert.alert(
       `Espacio ${espacio.numero}`,
-      `Ubicación: ${espacio.ubicacion}\nEstado: ${espacio.estado.toUpperCase()}`,
+      `Ubicacion: ${espacio.ubicacion}\nEstado: ${espacio.estado.toUpperCase()}`,
       opciones
     );
   };
@@ -457,7 +442,7 @@ const EspaciosScreen: React.FC = () => {
     return (
       <Container>
         <AppHeader
-          title="Gestión de Espacios"
+          title="Gestion de Espacios"
           subtitle="Monitoreo en tiempo real"
           onBackPress={() => navigation.goBack()}
         />
@@ -472,13 +457,13 @@ const EspaciosScreen: React.FC = () => {
   return (
     <Container>
       <AppHeader
-        title="Gestión de Espacios"
+        title="Gestion de Espacios"
         subtitle={`Actualizado ${getTimeSinceUpdate()}`}
         onBackPress={() => navigation.goBack()}
         onRightPress={() => {
-          console.log('🔄 Refresh manual');
+          console.log('Refresh manual');
           setRefreshing(true);
-          cargarEspacios();
+          cargarEspacios(true);
         }}
         rightIconName="refresh"
       />
@@ -489,9 +474,9 @@ const EspaciosScreen: React.FC = () => {
           <RefreshControl
             refreshing={refreshing}
             onRefresh={() => {
-              console.log('🔄 Pull to refresh');
+              console.log('Pull to refresh');
               setRefreshing(true);
-              cargarEspacios();
+              cargarEspacios(true);
             }}
             colors={[theme.colors.primary]}
             tintColor={theme.colors.primary}
@@ -505,7 +490,7 @@ const EspaciosScreen: React.FC = () => {
         <SearchBar
           value={searchQuery}
           onChangeText={setSearchQuery}
-          placeholder="Buscar por número, ubicación o patente"
+          placeholder="Buscar por numero, ubicacion o patente"
         />
 
         <FilterButtons
@@ -533,8 +518,8 @@ const EspaciosScreen: React.FC = () => {
         {espacioSeleccionado && (
           <>
             <ModalSection>
-              <ModalSectionTitle>Información General</ModalSectionTitle>
-              <ModalText>Ubicación: {espacioSeleccionado.ubicacion}</ModalText>
+              <ModalSectionTitle>Informacion General</ModalSectionTitle>
+              <ModalText>Ubicacion: {espacioSeleccionado.ubicacion}</ModalText>
               <ModalText>Estado: {espacioSeleccionado.estado.toUpperCase()}</ModalText>
               <ModalText>Tarifa: ${espacioSeleccionado.tarifaPorHora}/hora</ModalText>
             </ModalSection>
@@ -542,12 +527,12 @@ const EspaciosScreen: React.FC = () => {
             <ModalSection>
               <ModalSectionTitle>Estado del Sensor</ModalSectionTitle>
               <ModalText>Estado: {espacioSeleccionado.sensor.estado.toUpperCase()}</ModalText>
-              <ModalText>Última actualización: {espacioSeleccionado.sensor.ultimaActualizacion}</ModalText>
+              <ModalText>Ultima actualizacion: {espacioSeleccionado.sensor.ultimaActualizacion}</ModalText>
             </ModalSection>
 
             {espacioSeleccionado.vehiculoActual && (
               <ModalSection>
-                <ModalSectionTitle>Vehículo Actual</ModalSectionTitle>
+                <ModalSectionTitle>Vehiculo Actual</ModalSectionTitle>
                 <ModalText>Patente: {espacioSeleccionado.vehiculoActual.patente}</ModalText>
                 <ModalText>Hora de inicio: {espacioSeleccionado.vehiculoActual.horaInicio}</ModalText>
                 <ModalText>Tiempo transcurrido: {espacioSeleccionado.vehiculoActual.tiempoRestante}</ModalText>
