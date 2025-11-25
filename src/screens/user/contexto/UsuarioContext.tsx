@@ -45,6 +45,8 @@ type UsuarioContextType = {
   actualizarSaldoEstacionamiento: () => void;
   limpiarDatos: () => Promise<void>;
   sincronizarSaldoConServidor: () => Promise<void>;
+  parkingLocationAddress: string | null;
+  setParkingLocationAddress: React.Dispatch<React.SetStateAction<string | null>>;
 };
 
 export const UsuarioContext = createContext<UsuarioContextType | undefined>(undefined);
@@ -67,6 +69,7 @@ export const UsuarioProvider = ({ children }: UsuarioProviderProps) => {
     tarifaHora: 120,
     limite: 2,
   });
+  const [parkingLocationAddress, setParkingLocationAddress] = useState<string | null>(null);
 
   useEffect(() => {
     const cargarSaldoInicial = async () => {
@@ -446,6 +449,7 @@ export const UsuarioProvider = ({ children }: UsuarioProviderProps) => {
     setMovimientos([]);
     setPatente("");
     setEstacionamiento(null);
+    setParkingLocationAddress(null);
     
     try {
       await AsyncStorage.removeItem('estacionamientoActivo');
@@ -474,6 +478,8 @@ export const UsuarioProvider = ({ children }: UsuarioProviderProps) => {
         actualizarSaldoEstacionamiento,
         limpiarDatos,
         sincronizarSaldoConServidor,
+        parkingLocationAddress,
+        setParkingLocationAddress,
       }}
     >
       {children}

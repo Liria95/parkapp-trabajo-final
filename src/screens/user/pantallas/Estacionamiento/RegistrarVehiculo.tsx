@@ -27,6 +27,7 @@ export default function RegistrarVehiculo() {
     setPatente,
     iniciarEstacionamiento,
     configEstacionamiento,
+    parkingLocationAddress,
   } = usuarioContext;
 
   const { state } = authContext;
@@ -44,7 +45,11 @@ export default function RegistrarVehiculo() {
   
   const navigation = useNavigation<NativeStackNavigationProp<RutasStackParamList>>();
 
-  const ubicacion = espacioSeleccionado?.ubicacion || configEstacionamiento?.ubicacion || "Selecciona un espacio";
+  const ubicacion = espacioSeleccionado?.ubicacion 
+    || parkingLocationAddress 
+    || configEstacionamiento?.ubicacion 
+    || "AVENIDA SAN MARTIN 583, CIUDAD DE MENDOZA (Ubicación por defecto)";
+  
   const tarifaHora = espacioSeleccionado?.tarifaPorHora || configEstacionamiento?.tarifaHora || 100;
   const limite = configEstacionamiento?.limite || 2;
 
@@ -52,13 +57,14 @@ export default function RegistrarVehiculo() {
     console.log('===== REGISTRAR VEHICULO =====');
     console.log('User ID:', state.user?.id);
     console.log('Espacio seleccionado:', espacioSeleccionado?.numero);
+    console.log('Config Estacionamiento:', configEstacionamiento);
+    console.log('parkingLocationAddress:', parkingLocationAddress);
     console.log('Ubicacion:', ubicacion);
     console.log('Tarifa:', tarifaHora);
     console.log('Saldo:', saldo);
     console.log('================================');
-  }, [state, espacioSeleccionado, ubicacion, tarifaHora, saldo]);
+  }, [state, espacioSeleccionado, ubicacion, tarifaHora, saldo, configEstacionamiento, parkingLocationAddress]);
 
-  // Cargar espacios al montar el componente
   useEffect(() => {
     obtenerUbicacionYCargarEspacios();
   }, []);
@@ -82,7 +88,6 @@ export default function RegistrarVehiculo() {
         longitude: location.coords.longitude
       });
       
-      // Cargar espacios con la ubicación
       cargarEspaciosDisponibles({
         latitude: location.coords.latitude,
         longitude: location.coords.longitude
@@ -90,7 +95,6 @@ export default function RegistrarVehiculo() {
       
     } catch (error) {
       console.error('Error al obtener ubicacion:', error);
-      // Si falla GPS, cargar espacios sin filtro
       cargarEspaciosDisponibles();
     }
   };
@@ -112,13 +116,12 @@ export default function RegistrarVehiculo() {
       console.log('Ubicacion:', location || 'Sin ubicacion');
       console.log('========================================');
       
-      // Llamar al servicio con ubicación si está disponible
-      const response = await ParkingSpacesService.getAvailableSpacesForUser(
+      const response = await ParkingSpacesService.getAvailableSpaces(
         token,
         location ? {
           latitude: location.latitude,
           longitude: location.longitude,
-          radius: 1000 // CAMBIADO A 1000km
+          radius: 1000
         } : undefined
       );
 
@@ -131,15 +134,15 @@ export default function RegistrarVehiculo() {
       console.log('========================================');
 
       if (response.success && response.espacios) {
-        console.log('✅ Espacios cargados correctamente:', response.espacios.length);
+        console.log('Espacios cargados correctamente:', response.espacios.length);
         setEspaciosDisponibles(response.espacios);
       } else {
-        console.log('❌ Error al cargar espacios:', response.message);
+        console.log('Error al cargar espacios:', response.message);
         Alert.alert('Error', response.message || 'No se pudieron cargar espacios');
         setEspaciosDisponibles([]);
       }
     } catch (error) {
-      console.error('❌ Error al cargar espacios:', error);
+      console.error('Error al cargar espacios:', error);
       Alert.alert('Error', 'Error al cargar espacios');
       setEspaciosDisponibles([]);
     } finally {
@@ -153,7 +156,7 @@ export default function RegistrarVehiculo() {
   };
 
   const handleSeleccionarEspacio = (espacio: EspacioDisponible) => {
-    console.log('✅ Espacio seleccionado:', espacio.numero, espacio.ubicacion);
+    console.log('Espacio seleccionado:', espacio.numero, espacio.ubicacion);
     setEspacioSeleccionado(espacio);
     setMostrarModalEspacios(false);
   };
@@ -185,6 +188,12 @@ export default function RegistrarVehiculo() {
   }
 
   const handleIniciar = async () => {
+
+    if (ubicacion.includes("Ubicación por defecto") || !ubicacion || ubicacion === "Selecciona un espacio") {
+      Alert.alert("Error de Ubicación", "Aún no se pudo determinar tu ubicación actual desde el mapa. Por favor, espera unos segundos e inténtalo de nuevo.");
+      return;
+    }
+
     if (!patente || patente.trim() === "") {
       Alert.alert("Error", "Por favor ingresa una patente");
       return;
@@ -227,7 +236,6 @@ export default function RegistrarVehiculo() {
     navigation.navigate("EstacionamientoActivo");
   };
 
-  // DEBUG: Renderizar contenido del modal
   const renderModalContent = () => {
     console.log('========================================');
     console.log('RENDERIZANDO CONTENIDO DEL MODAL');
@@ -236,7 +244,7 @@ export default function RegistrarVehiculo() {
     console.log('========================================');
 
     if (loadingEspacios) {
-      console.log('→ Mostrando LOADING');
+      console.log('Mostrando LOADING');
       return (
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={theme.colors.primary} />
@@ -246,7 +254,7 @@ export default function RegistrarVehiculo() {
     }
 
     if (espaciosDisponibles.length === 0) {
-      console.log('→ Mostrando EMPTY');
+      console.log('Mostrando EMPTY');
       return (
         <View style={styles.emptyContainer}>
           <Ionicons name="car-outline" size={64} color={theme.colors.gray} />
@@ -261,7 +269,7 @@ export default function RegistrarVehiculo() {
       );
     }
 
-    console.log('→ Mostrando LISTA de', espaciosDisponibles.length, 'espacios');
+    console.log('Mostrando LISTA de', espaciosDisponibles.length, 'espacios');
     return (
       <ScrollView 
         style={styles.listaEspacios}
@@ -360,7 +368,6 @@ export default function RegistrarVehiculo() {
         />
       </ScrollView>
 
-      {/* Modal de seleccion de espacios */}
       <Modal 
         visible={mostrarModalEspacios} 
         transparent 
@@ -393,7 +400,6 @@ export default function RegistrarVehiculo() {
         </View>
       </Modal>
 
-      {/* Modal de saldo insuficiente */}
       <Modal visible={mostrarModalRecarga} transparent animationType="slide">
         <View style={styles.overlay}>
           <View style={styles.modal}>

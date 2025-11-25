@@ -1,11 +1,14 @@
-import { useContext } from 'react';
-import { View, Text, ScrollView, StyleSheet, TouchableOpacity, Alert } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
 import { useNavigation } from '@react-navigation/native';
-import { theme } from "../../../../config/theme";
-import { AuthContext} from '../../../../components/shared/Context/AuthContext/AuthContext';
+import { useContext } from 'react';
+import { Ionicons } from '@expo/vector-icons';
+import { theme } from "../../config/theme";
+import { ScrollView } from "react-native-gesture-handler";
+import AuthContext from "../../components/shared/Context/AuthContext/AuthContext";
 
-export default function Configuracion() {
+
+export default function ConfiguracionScreen() {
+
   const navigation = useNavigation();
   const { state } = useContext(AuthContext);
 
@@ -33,16 +36,9 @@ export default function Configuracion() {
   };
 
   return (
-    <View style={styles.container}>
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()}>
-          <Ionicons name="arrow-back" size={24} color={theme.colors.white} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Configuración</Text>
-        <View style={{ width: 24 }} />
-      </View>
+    <View style={styles.container}> 
 
-      <ScrollView style={styles.content}>
+      <ScrollView>
         <View style={styles.infoCard}>
           <Ionicons name="person-circle" size={64} color={theme.colors.primary} />
           <Text style={styles.userName}>{state.user?.name} {state.user?.surname}</Text>
@@ -70,7 +66,9 @@ export default function Configuracion() {
           <Text style={styles.versionText}>ParkApp v1.0.0</Text>
           <Text style={styles.versionSubtext}>© 2025 Todos los derechos reservados</Text>
         </View>
+
       </ScrollView>
+
     </View>
   );
 }

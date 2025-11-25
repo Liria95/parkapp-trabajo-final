@@ -28,7 +28,7 @@ type RootStackParamList = {
   Infracciones: undefined;
   GestionUsuarios: undefined;
   Espacios: undefined;
-  AdminDrawer: undefined;
+  PerfilStack: undefined;
 };
 
 type AdminDashboardNavigationProp = NativeStackNavigationProp<RootStackParamList, 'AdminDashboard'>;
@@ -82,7 +82,7 @@ const AdminDashboard: React.FC = () => {
     React.useCallback(() => {
       setActiveTab('dashboard');
       cargarDatos();
-    }, [])
+    }, []) 
   );
 
   const cargarDatos = async () => {
@@ -273,12 +273,6 @@ const AdminDashboard: React.FC = () => {
       onPress: () => handleNavigation('dashboard'),
     },
     {
-      id: 'admindrawer',
-      label: 'ADMIN',
-      iconName: 'briefcase-outline',
-      onPress: () => handleNavigation('admindrawer'),
-    },
-    {
       id: 'espacios',
       label: 'ESPACIOS',
       iconName: 'car-outline',
@@ -290,6 +284,12 @@ const AdminDashboard: React.FC = () => {
       iconName: 'people-outline',
       onPress: () => handleNavigation('usuarios'),
     },
+    {
+      id: 'perfilstack',
+      label: 'ADMIN',
+      iconName: 'briefcase-outline',
+      onPress: () => handleNavigation('perfilstack'),
+    }
   ];
 
   const handleUserAction = (userId: string) => {
@@ -328,8 +328,8 @@ const AdminDashboard: React.FC = () => {
       case 'espacios':
         navigation.navigate('Espacios');
         break;
-      case 'admindrawer':
-        navigation.navigate('AdminDrawer');
+      case 'perfilstack':
+        navigation.navigate('PerfilStack');
         break;
       default:
         console.warn(`Sección desconocida: ${section}`);
@@ -365,7 +365,6 @@ const AdminDashboard: React.FC = () => {
         contentContainerStyle={{ flexGrow: 1 }}
       >
         <StatsGrid stats={statsConfig} />
-
         <SectionCard title="Gráfico de ocupación">
           <ChartPlaceholder
             iconName="bar-chart-outline"

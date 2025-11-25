@@ -35,7 +35,7 @@ export default function NotificationsScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: theme.colors.white, padding: 16 },
+  container: { flex: 1, backgroundColor: theme.colors.white, padding: 16, marginTop:20 },
   title: { fontSize: 22, fontWeight: "bold", marginBottom: 12, color: theme.colors.primary },
   empty: { textAlign: "center", marginTop: 40, color: theme.colors.gray },
   card: { backgroundColor: "#FAF3E3", padding: 15, borderRadius: 10, marginBottom: 10 },
