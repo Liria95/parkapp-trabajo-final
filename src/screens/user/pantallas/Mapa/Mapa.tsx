@@ -1,64 +1,76 @@
 import { useContext, useState, useEffect, useRef } from "react";
-import { View, Text, StyleSheet, Image, TouchableOpacity } from "react-native";
+import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Alert } from "react-native";
 import TarjetaGradiente from "../../componentes/TarjetaGradiente";
 import BotonPrimSec from "../../componentes/Boton";
 import { theme } from "../../../../config/theme";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
 import { UsuarioContext } from "../../contexto/UsuarioContext";
-import MapView, { Marker } from 'react-native-maps';
+import { AuthContext } from "../../../../components/shared/Context/AuthContext/AuthContext";
+import MapView, { Marker, Callout } from 'react-native-maps';
 import * as Location from 'expo-location';
+import { ParkingSpacesService } from '../../../../services/ParkingSpacesService';
+
+type LocationType = {
+  latitude: number;
+  longitude: number;
+  latitudeDelta: number;
+  longitudeDelta: number;
+};
+
+interface ParkingSpace {
+  id: string;
+  numero: string;
+  ubicacion: string;
+  tarifaPorHora: number;
+  latitude: number;
+  longitude: number;
+  status: string;
+  distancia?: number;
+}
 
 export default function Mapa() {
   const context = useContext(UsuarioContext);
+  const authContext = useContext(AuthContext);
+
   if (!context) throw new Error("UsuarioContext debe estar dentro del UsuarioProvider");
 
   const {
     saldo,
     estacionamiento,
-    configEstacionamiento,
     actualizarSaldoEstacionamiento,
-    setParkingLocationAddress, 
+    setParkingLocationAddress,
   } = context;
 
-  //rferencia para controlar el MapView (para animación)
-  const mapRef = useRef(null);
+  const mapRef = useRef<MapView>(null);
 
-  //definición de tipos
-  type locationType = {
-  latitude: number,
-  longitude: number,
-  latitudeDelta: number,
-  longitudeDelta: number,
-};
-
-  const [region, setRegion] = useState({
-    //región por defecto CABA
-    latitude: -34.6067,
-    longitude: -58.33816,
-    latitudeDelta: 0.05, // zoom inicial 
+  // Campo Grande, Misiones, Argentina - ubicación por defecto
+  const [region, setRegion] = useState<LocationType>({
+    latitude: -27.4331,
+    longitude: -55.5384,
+    latitudeDelta: 0.05,
     longitudeDelta: 0.05,
   });
 
-  const [userLocation, setUserLocation] = useState<locationType>();
+  const [userLocation, setUserLocation] = useState<LocationType | null>(null);
   const [currentAddress, setCurrentAddress] = useState("Obteniendo dirección...");
+  const [parkingSpaces, setParkingSpaces] = useState<ParkingSpace[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
 
-
-  //Traduce coordenadas a dirección 
+  // Traduce coordenadas a dirección
   const fetchAddressFromCoords = async (latitude: number, longitude: number) => {
     try {
       const addressArray = await Location.reverseGeocodeAsync({ latitude, longitude });
-    
+
       if (addressArray.length > 0) {
         const addr = addressArray[0];
-        //dirección legible con calle, número (si existe) y ciudad/país
-        const formattedAddress = `${addr.street} ${addr.streetNumber || ''}, ${addr.city}, ${addr.country}`;
+        const formattedAddress = `${addr.street || ''} ${addr.streetNumber || ''}, ${addr.city || ''}, ${addr.country || ''}`.trim();
         setCurrentAddress(formattedAddress);
 
         if (setParkingLocationAddress) {
-            setParkingLocationAddress(formattedAddress);
+          setParkingLocationAddress(formattedAddress);
         }
-        
       } else {
         setCurrentAddress("Dirección no encontrada.");
       }
@@ -68,42 +80,143 @@ export default function Mapa() {
     }
   };
 
-  useEffect(() => {
-    const fetchLocation = async () => {
-      let {status} = await Location.requestForegroundPermissionsAsync();
+  // Obtener ubicación del usuario
+  const fetchLocation = async () => {
+    try {
+      const { status } = await Location.requestForegroundPermissionsAsync();
 
       if (status !== 'granted') {
-        console.error('El permiso para acceder a la ubicación fue denegada.')
+        console.log('Permiso de ubicación denegado. Usando ubicación por defecto.');
+        Alert.alert(
+          'Ubicación',
+          'Para ver espacios cercanos, permite el acceso a la ubicación.',
+          [{ text: 'OK' }]
+        );
         return;
       }
 
-      try {
-        let location = await Location.getCurrentPositionAsync({
-          accuracy: Location.Accuracy.High,
-        });
+      const location = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.Balanced,
+      });
 
-        const newRegion = {
-          latitude: location.coords.latitude,
-          longitude: location.coords.longitude,
-          latitudeDelta: 0.005, // mayor zoom para centrar al usuario
-          longitudeDelta: 0.005,
-        };
+      const newRegion: LocationType = {
+        latitude: location.coords.latitude,
+        longitude: location.coords.longitude,
+        latitudeDelta: 0.01,
+        longitudeDelta: 0.01,
+      };
 
-        setUserLocation(newRegion);
-        setRegion(newRegion); //centrar el mapa en la nueva ubicación
+      setUserLocation(newRegion);
+      setRegion(newRegion);
 
-        fetchAddressFromCoords(location.coords.latitude, location.coords.longitude);
-
-      } catch (error) {
-        console.error("Error al obtener la ubicación:", error);
+      // Centrar mapa en ubicación del usuario
+      if (mapRef.current) {
+        mapRef.current.animateToRegion(newRegion, 1000);
       }
-    };
 
-    fetchLocation();
+      fetchAddressFromCoords(location.coords.latitude, location.coords.longitude);
+    } catch (error) {
+      console.error("Error al obtener la ubicación:", error);
+      Alert.alert('Error', 'No se pudo obtener tu ubicación');
+    }
+  };
+
+  // Cargar espacios de estacionamiento
+  const cargarEspacios = async (isRefresh: boolean = false) => {
+    const token = authContext?.state.token;
+
+    if (!token) {
+      console.log('No hay token disponible');
+      setLoading(false);
+      return;
+    }
+
+    try {
+      if (!isRefresh) {
+        setLoading(true);
+      }
+
+      console.log('🚗 Cargando espacios de estacionamiento...');
+
+      // Obtener espacios con filtro de ubicación si está disponible
+      const locationFilter = userLocation ? {
+        latitude: userLocation.latitude,
+        longitude: userLocation.longitude,
+        radius: 5000, // 5km de radio
+      } : undefined;
+
+      const result = await ParkingSpacesService.getAvailableSpaces(
+        token,
+        locationFilter
+      );
+
+      if (result.success && result.espacios) {
+        console.log(`✅ ${result.espacios.length} espacios cargados`);
+        setParkingSpaces(result.espacios as ParkingSpace[]);
+      } else {
+        console.log('❌ Error al cargar espacios:', result.message);
+      }
+    } catch (error) {
+      console.error('Error al cargar espacios:', error);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  };
+
+  // Auto-refresh cada 15 segundos
+  useEffect(() => {
+    const interval = setInterval(() => {
+      console.log('🔄 Auto-refrescando espacios...');
+      cargarEspacios(true);
+    }, 15000);
+
+    return () => clearInterval(interval);
+  }, [userLocation]);
+
+  // Cargar ubicación y espacios al iniciar
+  useEffect(() => {
+    const init = async () => {
+      await fetchLocation();
+      await cargarEspacios();
+    };
+    init();
   }, []);
 
-  let saldoRestante = saldo;
+  // Obtener color del marcador según estado
+  const getMarkerColor = (status: string) => {
+    switch (status) {
+      case 'available':
+        return theme.colors.success; // Verde
+      case 'occupied':
+        return theme.colors.danger; // Rojo
+      case 'maintenance':
+        return theme.colors.warning; // Amarillo
+      case 'reserved':
+        return theme.colors.primary; // Azul
+      default:
+        return theme.colors.gray;
+    }
+  };
 
+  // Obtener texto del estado
+  const getStatusText = (status: string) => {
+    switch (status) {
+      case 'available':
+        return 'LIBRE';
+      case 'occupied':
+        return 'OCUPADO';
+      case 'maintenance':
+        return 'MANTENIMIENTO';
+      case 'reserved':
+        return 'RESERVADO';
+      default:
+        return 'DESCONOCIDO';
+    }
+  };
+
+  // Calcular saldo restante
+  let saldoRestante = saldo;
   if (estacionamiento?.activo) {
     const tiempoTranscurrido = Math.floor(
       (Date.now() - new Date(estacionamiento.inicio).getTime()) / 1000
@@ -111,6 +224,34 @@ export default function Mapa() {
     const costoActual = (tiempoTranscurrido / 3600) * estacionamiento.tarifaHora;
     saldoRestante = Math.max(saldo - costoActual, 0);
   }
+
+  // Manejar selección de espacio
+  const handleSpaceSelect = (space: ParkingSpace) => {
+    Alert.alert(
+      `Espacio ${space.numero}`,
+      `Ubicación: ${space.ubicacion}\nEstado: ${getStatusText(space.status)}\nTarifa: $${space.tarifaPorHora}/hora${space.distancia ? `\nDistancia: ${(space.distancia).toFixed(0)}m` : ''}`,
+      [
+        { text: 'Cerrar', style: 'cancel' },
+        space.status === 'available' ? {
+          text: 'Estacionar aquí',
+          onPress: () => console.log('Iniciar estacionamiento:', space.id)
+        } : undefined
+      ].filter(Boolean) as any
+    );
+  };
+
+  // Centrar mapa en mi ubicación
+  const centerOnUser = () => {
+    if (userLocation && mapRef.current) {
+      mapRef.current.animateToRegion(userLocation, 1000);
+    }
+  };
+
+  // Refrescar espacios
+  const handleRefresh = () => {
+    setRefreshing(true);
+    cargarEspacios(true);
+  };
 
   return (
     <View style={styles.contenedor}>
@@ -120,12 +261,8 @@ export default function Mapa() {
         {/* Tarjeta de saldo */}
         <TarjetaGradiente colores={[theme.colors.secondary, theme.colors.success]}>
           <View style={styles.cardSaldo}>
-            <Text style={styles.textoSaldo}>
-              SALDO DISPONIBLE:
-            </Text>
-            <Text style={styles.saldoActual}>
-              ${saldoRestante.toFixed(2)}
-            </Text>
+            <Text style={styles.textoSaldo}>SALDO DISPONIBLE:</Text>
+            <Text style={styles.saldoActual}>${saldoRestante.toFixed(2)}</Text>
 
             {estacionamiento?.activo && (
               <TouchableOpacity
@@ -144,42 +281,123 @@ export default function Mapa() {
           colors={[theme.colors.secondary, theme.colors.success]}
           style={styles.contCardMapa}
         >
-          <MapView 
-            style={styles.mapa} 
-            region={region}
-            onRegionChangeComplete={setRegion} //actualiza region al arrastrar el mapa
-            showsUserLocation={true} // muestra el punto azul de ubicación
-            showsMyLocationButton={true} // Muestra el botón de centrar en la ubicación
-            toolbarEnabled={false}
-            >
-              
-              {userLocation && (
-                <Marker coordinate = {{
-                  latitude:region.latitude,
-                  longitude: region.longitude
-                }}
-                title="Estás Aquí"
-                description="Tu ubicación actual"
-                pinColor={theme.colors.primary}
+          {loading && !refreshing ? (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="large" color={theme.colors.white} />
+              <Text style={styles.loadingText}>Cargando mapa...</Text>
+            </View>
+          ) : (
+            <>
+              <MapView
+                ref={mapRef}
+                style={styles.mapa}
+                region={region}
+                onRegionChangeComplete={setRegion}
+                showsUserLocation={true}
+                showsMyLocationButton={false}
+                toolbarEnabled={false}
+              >
+                {/* Marcador de ubicación del usuario */}
+                {userLocation && (
+                  <Marker
+                    coordinate={{
+                      latitude: userLocation.latitude,
+                      longitude: userLocation.longitude,
+                    }}
+                    title="Estás Aquí"
+                    description="Tu ubicación actual"
+                  >
+                    <View style={styles.userMarker}>
+                      <Ionicons name="person" size={20} color={theme.colors.white} />
+                    </View>
+                  </Marker>
+                )}
 
-                />
-              )}  
+                {/* Marcadores de espacios de estacionamiento */}
+                {parkingSpaces.map((space) => (
+                  <Marker
+                    key={space.id}
+                    coordinate={{
+                      latitude: space.latitude,
+                      longitude: space.longitude,
+                    }}
+                    onPress={() => handleSpaceSelect(space)}
+                  >
+                    <View
+                      style={[
+                        styles.parkingMarker,
+                        { backgroundColor: getMarkerColor(space.status) },
+                      ]}
+                    >
+                      <Text style={styles.markerText}>{space.numero}</Text>
+                    </View>
+                    <Callout>
+                      <View style={styles.callout}>
+                        <Text style={styles.calloutTitle}>{space.numero}</Text>
+                        <Text style={styles.calloutText}>{getStatusText(space.status)}</Text>
+                        <Text style={styles.calloutText}>${space.tarifaPorHora}/h</Text>
+                      </View>
+                    </Callout>
+                  </Marker>
+                ))}
+              </MapView>
 
-          </MapView>
+              {/* Botones flotantes */}
+              <View style={styles.floatingButtons}>
+                <TouchableOpacity
+                  style={styles.floatingButton}
+                  onPress={centerOnUser}
+                >
+                  <Ionicons name="locate" size={24} color={theme.colors.white} />
+                </TouchableOpacity>
 
-          <Text style={styles.textoTarjetaTitulo}>Ubicación</Text>
-          <Text style={styles.textoMapaSimulado}>
-            {currentAddress}
-          </Text>
+                <TouchableOpacity
+                  style={styles.floatingButton}
+                  onPress={handleRefresh}
+                  disabled={refreshing}
+                >
+                  <Ionicons
+                    name="refresh"
+                    size={24}
+                    color={theme.colors.white}
+                    style={refreshing ? { opacity: 0.5 } : {}}
+                  />
+                </TouchableOpacity>
+              </View>
+            </>
+          )}
+
+          <View style={styles.infoContainer}>
+            <Text style={styles.textoTarjetaTitulo}>
+              {parkingSpaces.length} espacios disponibles
+            </Text>
+            <Text style={styles.textoMapaSimulado}>{currentAddress}</Text>
+          </View>
         </LinearGradient>
+
+        {/* Leyenda de colores */}
+        <View style={styles.legend}>
+          <View style={styles.legendItem}>
+            <View style={[styles.legendColor, { backgroundColor: theme.colors.success }]} />
+            <Text style={styles.legendText}>Libre</Text>
+          </View>
+          <View style={styles.legendItem}>
+            <View style={[styles.legendColor, { backgroundColor: theme.colors.danger }]} />
+            <Text style={styles.legendText}>Ocupado</Text>
+          </View>
+          <View style={styles.legendItem}>
+            <View style={[styles.legendColor, { backgroundColor: theme.colors.warning }]} />
+            <Text style={styles.legendText}>Mantenimiento</Text>
+          </View>
+        </View>
 
         {/* Botón buscar zona */}
         <BotonPrimSec
-          titulo="Buscar zona"
+          titulo="Actualizar espacios"
           tipo="borde"
           redondeado="bajo"
           color={theme.colors.dark}
-          onPress={() => console.log("Buscando zona... Actualizando el mapa")}
+          onPress={handleRefresh}
         />
       </View>
     </View>
@@ -207,27 +425,41 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
   },
   contCardMapa: {
-    height: "50%",
+    height: "55%",
     alignItems: "center",
     borderRadius: 15,
-    overflow:'hidden',
+    overflow: 'hidden',
   },
   mapa: {
     width: "100%",
-    height: 200,
-    borderRadius: 10,
+    height: "75%",
+  },
+  loadingContainer: {
+    width: "100%",
+    height: "75%",
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    color: theme.colors.white,
+    marginTop: 10,
+  },
+  infoContainer: {
+    width: "100%",
+    alignItems: "center",
+    paddingVertical: 10,
   },
   textoTarjetaTitulo: {
     fontSize: 17,
     color: theme.colors.white,
     fontWeight: "bold",
-    paddingTop: 15,
   },
   textoMapaSimulado: {
-    fontSize: 15,
-    fontWeight: "bold",
+    fontSize: 13,
     color: theme.colors.white,
-    padding: 15,
+    paddingHorizontal: 15,
+    paddingTop: 5,
+    textAlign: 'center',
   },
   cardSaldo: {
     padding: 15,
@@ -254,5 +486,87 @@ const styles = StyleSheet.create({
     marginLeft: 5,
     color: theme.colors.primary,
     fontWeight: "bold",
+  },
+  userMarker: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: theme.colors.primary,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 3,
+    borderColor: theme.colors.white,
+  },
+  parkingMarker: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: theme.colors.white,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 3,
+    elevation: 5,
+  },
+  markerText: {
+    color: theme.colors.white,
+    fontWeight: 'bold',
+    fontSize: 10,
+  },
+  callout: {
+    padding: 10,
+    minWidth: 120,
+  },
+  calloutTitle: {
+    fontWeight: 'bold',
+    fontSize: 14,
+    marginBottom: 5,
+  },
+  calloutText: {
+    fontSize: 12,
+    color: theme.colors.gray,
+  },
+  floatingButtons: {
+    position: 'absolute',
+    right: 10,
+    top: 10,
+    gap: 10,
+  },
+  floatingButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: theme.colors.primary,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 3,
+    elevation: 5,
+  },
+  legend: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    paddingVertical: 10,
+    backgroundColor: theme.colors.lightGray,
+    borderRadius: 10,
+  },
+  legendItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  legendColor: {
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    marginRight: 5,
+  },
+  legendText: {
+    fontSize: 12,
+    color: theme.colors.dark,
   },
 });
