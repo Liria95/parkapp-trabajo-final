@@ -5,20 +5,24 @@ ParkApp es una aplicación móvil integral construida con React Native y TypeScr
 ## 🚀 Características
 
 ### 👤 Características para Usuarios Finales
-- **Registro y Autenticación de Usuarios**: Registro seguro y login con validación completa de formularios
-- **Gestión de Estacionamiento**: Sesiones de estacionamiento activas, registro de vehículos e historial de estacionamiento
-- **Mapa Interactivo**: Visualización en tiempo real de espacios de estacionamiento usando mapas
-- **Gestión de Saldo**: Funcionalidad de billetera para pagos de estacionamiento y recargas
-- **Notificaciones**: Alertas en tiempo real para estado de estacionamiento, multas y actualizaciones de saldo
-- **Gestión de Perfil**: Configuración de cuenta de usuario y gestión de sesiones
+- **Registro y Autenticación de Usuarios**: Registro seguro y login con validación completa de formularios.
+- **Gestión de Estacionamiento y Vehículos**: Manejo de sesiones activas de estacionamiento, registro rápido de vehículos y acceso a historial detallado.
+- **Captura de Patente con Cámara**: Uso de la cámara del dispositivo para capturar la patente del vehículo, facilitando el ingreso y reduciendo errores.
+- **Mapa Interactivo en Tiempo Real**: Visualización clara y actualizada de espacios disponibles para estacionar, mejorando la experiencia de búsqueda.
+- **Gestión de Saldo y Pagos**: Funcionalidad integrada para recarga y control del saldo disponible en la billetera digital para pagos rápidos.
+- **Notificaciones en Tiempo Real**: Alertas sobre cambios en el estado del estacionamiento, saldo bajo, multas emitidas y confirmaciones de recargas.
+- **Configuración y Gestión de Perfil**: Opciones para editar datos personales, cambiar contraseñas y gestionar la sesión del usuario con facilidad.
+- **Soporte y Ayuda**: Acceso a canales de soporte directos para resolver dudas y reportar problemas relacionados con el uso de la aplicación.
 
 ### 🛠️ Características para Administradores
-- **Análisis del Dashboard**: Estadísticas en tiempo real e indicadores clave de rendimiento
-- **Gestión de Usuarios**: Administración y monitoreo completo de usuarios
-- **Gestión de Espacios**: Configuración y supervisión de espacios de estacionamiento
-- **Gestión de Infracciones**: Emisión y seguimiento de violaciones de estacionamiento
-- **Registro Manual**: Capacidades de registro administrativo de vehículos
-- **Configuración del Sistema**: Configuraciones de la aplicación y parámetros
+- **Dashboard Analítico Avanzado**: Panel con indicadores clave y estadísticas en tiempo real que proporcionan una visión completa del sistema.
+- **Gestión Integral de Usuarios**: Capacidad para añadir, modificar, eliminar y monitorear cuentas de usuarios con herramientas administrativas avanzadas.
+- **Administración de Espacios de Estacionamiento**: Control sobre la configuración, actualización y supervisión de la disponibilidad y asignación de espacios.
+- **Manejo Eficiente de Infracciones**: Emisión, revisión y seguimiento detallado de multas, incluyendo historial y estado de cumplimiento.
+- **Registro Manual y Corrección de Datos**: Herramientas para ingresar vehículos o corregir registros directamente desde la interfaz administrativa.
+- **Mapa Dinámico para Supervisión**: Visualización geolocalizada de todos los espacios y su estado, con indicadores visuales útiles para la toma de decisiones.
+- **Configuración y Parámetros del Sistema**: Ajuste de diferentes parámetros del sistema, incluyendo políticas, notificaciones y opciones de seguridad.
+- **Reportes y Exportación de Datos**: Generación de reportes personalizados y exportables para análisis y auditorías periódicas.
 
 ## 🛠️ Stack Tecnológico
 
@@ -52,27 +56,35 @@ ParkApp es una aplicación móvil integral construida con React Native y TypeScr
 
 ```
 parkapp/
-├── assets/                          # Activos estáticos (iconos, imágenes)
-├── components/                      # Componentes UI reutilizables
-│   ├── adminpanel/                  # Componentes específicos de admin
-│   ├── auth/                        # Componentes de autenticación
-│   ├── cards/                       # Componentes de tarjetas
-│   ├── common/                      # Componentes comunes compartidos
-│   ├── dashboard/                   # Widgets del dashboard
-│   ├── grids/                       # Diseños de cuadrícula
-│   ├── infractions/                 # Gestión de infracciones
-│   ├── modals/                      # Diálogos modales
-│   ├── navigation/                  # Componentes de navegación
-│   ├── registration/                 # Componentes de registro
-│   └── shared/                      # Utilidades y contexto compartidos
+├── components/                      # Componentes UI reutilizables adicionales
 ├── constants/                       # Constantes y configuraciones de la app
-├── hooks/                           # Hooks personalizados de React
 ├── screens/                         # Componentes de pantalla
-│   ├── admin/                       # Pantallas de admin
-│   ├── auth/                        # Pantallas de autenticación
-│   └── user/                        # Pantallas de usuario
-├── services/                        # Servicios API y lógica de negocio
-└── utils/                           # Funciones utilitarias y helpers
+├── src/                             # Código fuente principal
+│   ├── assets/                      # Activos estáticos (iconos, imágenes, screenshots)
+│   ├── components/                  # Componentes UI reutilizables
+│   │   ├── adminpanel/              # Componentes específicos de admin (si aplicable)
+│   │   ├── auth/                    # Componentes de autenticación
+│   │   ├── cards/                   # Componentes de tarjetas
+│   │   ├── common/                  # Componentes comunes compartidos
+│   │   ├── dashboard/               # Widgets del dashboard
+│   │   ├── grids/                   # Diseños de cuadrícula
+│   │   ├── historial/               # Componentes de historial
+│   │   ├── infractions/             # Gestión de infracciones
+│   │   ├── modals/                  # Diálogos modales
+│   │   ├── navigation/              # Componentes de navegación
+│   │   ├── registration/            # Componentes de registro
+│   │   └── shared/                  # Utilidades y contexto compartidos
+│   ├── config/                      # Configuraciones (API, Firebase, tema)
+│   ├── forms/                       # Componentes de formularios
+│   ├── hooks/                       # Hooks personalizados de React
+│   ├── screens/                     # Componentes de pantalla
+│   │   ├── admin/                   # Pantallas de admin
+│   │   ├── auth/                    # Pantallas de autenticación
+│   │   └── user/                    # Pantallas de usuario
+│   ├── services/                    # Servicios API y lógica de negocio
+│   └── utils/                       # Funciones utilitarias y helpers
+├── utils/                           # Utilidades adicionales
+└── [otros archivos de configuración]
 ```
 
 ## 🚀 Instalación y Configuración
@@ -88,7 +100,8 @@ parkapp/
 
 1. **Clonar el repositorio**
    ```bash
-   git clone <https://github.com/Liria95/parkapp.git>
+   git clone <https://github.com/Liria95/parkapp-trabajo-final.git>
+    
    cd parkapp
    ```
 
@@ -127,45 +140,70 @@ parkapp/
 
 ### 👤 Usuario Final
 <p align="center">
- 
-  <img src="./assets/screenshots/login usuario final.png" alt="Pantalla de Login usuario final " width="220"/>
-  <img src="./assets/screenshots/register.png" alt="Pantalla de Registro" width="220"/>
-  <img src="./assets/screenshots/mapa.png" alt="Mapa Interactivo" width="220"/>
+
+  <img src="./src/assets/screenshots/login usuario final.png" alt="Pantalla de Login usuario final " width="220"/>
+  <img src="./src/assets/screenshots/register.png" alt="Pantalla de Registro" width="220"/>
+  <img src="./src/assets/screenshots/usuario/Mapa.png" alt="Mapa" width="220"/>
+  <img src="./src/assets/screenshots/usuario/Mapa con saldo.png" alt="Mapa con saldo" width="220"/>
+  <img src="./src/assets/screenshots/usuario/Registro camara.png" alt="Registro camara" width="220"/>
+  <img src="./src/assets/screenshots/usuario/Registro habilita camara.png" alt="Registro habilita camara" width="220"/>
+    <img src="./src/assets/screenshots/usuario/Estacionamiento iniciado.png" alt="Estacinamiento iniciado" width="220"/>
+  <img src="./src/assets/screenshots/usuario/Estacionmamiento activo.png" alt="Estacionamiento activo" width="220"/>
+  <img src="./src/assets/screenshots/usuario/Aviso saldo insuficiente.png" alt="Aviso saldo insuficiente" width="220"/>
+  <img src="./src/assets/screenshots/usuario/Recarga de saldo.png" alt="Recarga de saldo" width="220"/>
+  <img src="./src/assets/screenshots/usuario/Recarga exitosa.png" alt="Recarga exitosa" width="220"/>
+  <img src="./src/assets/screenshots/usuario/Notificacion recarga exitosa.png" alt="Notificacion recarga exitosa" width="220"/>
+  <img src="./src/assets/screenshots/usuario/Infraciones Pendientes.png" alt="Infraciones Pendientes" width="220"/>
+  <img src="./src/assets/screenshots/usuario/Perfil.png" alt="Perfil" width="220"/>
+  <img src="./src/assets/screenshots/usuario/Editar perfil.png" alt="Editar perfil" width="220"/>
+  <img src="./src/assets/screenshots/usuario/Perfil actualizado.png" alt="Perfil actializado" width="220"/>
+  <img src="./src/assets/screenshots/usuario/Mis vehiculos.png" alt="Mis vehiculos" width="220"/>
   
+
+
+
 </p>
 
 ### 🛠️ Administrador
 <p align="center">
-<img src="./assets/screenshots/login admin.png" alt="Pantalla de Login admin" width="220"/>
-  <img src="./assets/screenshots/dashboard.png" alt="Dashboard Admin" width="220"/>
-  <img src="./assets/screenshots/infracciones.png" alt="Gestión de Infracciones" width="220"/>
+<img src="./src/assets/screenshots/login admin.png" alt="Pantalla de Login admin" width="220"/>
+  <img src="./src/assets/screenshots/dashboard.png" alt="Dashboard Admin" width="220"/>
+  <img src="./src/assets/screenshots/infracciones.png" alt="Gestión de Infracciones" width="220"/>
+  <img src="./src/assets/screenshots/admin/Mapa Saldo.png" alt="Mapa Saldo" width="220"/>
+  <img src="./src/assets/screenshots/admin/Gestion de usuarios.png" alt="Gestion de usuarios" width="220"/>
+  <img src="./src/assets/screenshots/admin/Gestion de espacios actualizado.png" alt="GGestion de espacios actualizado" width="220"/>
+  <img src="./src/assets/screenshots/admin/Espacio ocupado.png" alt="Espacio ocupado" width="220"/>
+  <img src="./src/assets/screenshots/admin/Finaliza estacionamiento.png" alt="Finaliza estacionamiento" width="220"/>
+  <img src="./src/assets/screenshots/admin/Espacios ocupados gestion.png" alt="Espacio ocupados gestion" width="220"/>
+  <img src="./src/assets/screenshots/admin/Espacio libre.png" alt="Espacio libre" width="220"/>
+  <img src="./src/assets/screenshots/admin/Registro manual.png" alt="Registro manual" width="220"/>
+  <img src="./src/assets/screenshots/admin/Pago Efectivo.png" alt="Pago Efectivo" width="220"/>
+  <img src="./src/assets/screenshots/admin/Selecion espacio.png" alt="Selecion espacio" width="220"/>
 </p>
 
 
 ### Para Usuarios Finales
-1. **Registrarse**: Crear una nueva cuenta con validación de email y contraseña
-2. **Iniciar Sesión**: Autenticarse con sus credenciales
-3. **Buscar Estacionamiento**: Usar el mapa para localizar espacios disponibles
-4. **Iniciar Estacionamiento**: Registrar su vehículo y comenzar sesión de estacionamiento
-5. **Gestionar Saldo**: Recargar su billetera y monitorear gastos
-6. **Ver Historial**: Revisar historial de estacionamiento y multas recibidas
+1. **Registro y autenticación**: Crear una cuenta con validación de correo electrónico y contraseña segura, además de iniciar sesión para acceder a la app.
+2. **Gestión de perfil y vehículos**: Editar y actualizar información personal, registrar y administrar múltiples vehículos para facilitar el inicio rápido de sesiones de estacionamiento.
+3. **Búsqueda y visualización de espacios de estacionamiento**: Navegar por un mapa interactivo que muestra en tiempo real los espacios disponibles, con indicadores visuales claros del saldo actual.
+4. **Inicio y gestión de sesiones de estacionamiento**: Registrar la patente del vehículo utilizando la cámara del dispositivo móvil para mayor comodidad, iniciar y monitorear sesiones activas con alertas oportunas.
+5. **Gestión y recarga de saldo**: Consultar el saldo disponible, recibir notificaciones sobre saldo insuficiente y realizar recargas fácilmente, garantizando fondos suficientes para el uso del estacionamiento.
+6. **Historial y notificaciones**: Visualizar el historial de estacionamientos y multas pendientes, y recibir notificaciones en tiempo real sobre recargas exitosas, infracciones o cambios en el estado del usuario.
 
 ### Para Administradores
-1. **Iniciar Sesión**: Usar credenciales de admin para acceder al panel administrativo
-2. **Dashboard**: Monitorear estadísticas del sistema y actividad de usuarios
-3. **Gestionar Usuarios**: Ver, editar y administrar cuentas de usuario
-4. **Manejar Infracciones**: Emitir y rastrear violaciones de estacionamiento
-5. **Configurar Espacios**: Configurar y gestionar áreas de estacionamiento
-6. **Registro Manual**: Registrar vehículos en nombre de usuarios
+1. **Acceso seguro y panel administrativo**: Iniciar sesión con credenciales administrativas para acceder a un panel completo y funcional.
+2. **Dashboard con métricas y análisis en tiempo real**: Monitorear indicadores clave, estadísticas de usuarios, actividades y estado general del sistema a través de gráficos y reportes visuales.
+3. **Gestión integral de usuarios**: Visualizar, editar y administrar información de usuarios, facilitando el control y soporte.
+4. **Administración de espacios de estacionamiento**: Supervisar y actualizar la configuración de espacios, incluyendo la disponibilidad y asignación.
+5. **Gestión de infracciones**: Emitir multas, revisar estados y hacer seguimiento a las infracciones de manera eficiente desde el panel administrativo.
+6. **Registro manual y soporte administrativo**: Añadir registros de vehículos manualmente en nombre de los usuarios, asistiendo en casos especiales o correcciones.
 
 ## 🔐 Cuentas de Prueba
 
 ### Cuentas de Administrador
-- **Email**: admin@gmail.com | **Contraseña**: admin123
 - **Email**: admin@parkapp.com | **Contraseña**: admin123
 
 ### Registro de Usuario
-- **Email**: usuario@gmail.com | **Contraseña**: 123456
 - Los nuevos usuarios pueden registrarse a través de la pantalla de registro de la aplicación
 - Todos los registros requieren verificación de email y confirmación de contraseña
 
@@ -197,12 +235,10 @@ parkapp/
 2. ANABELLA VENTAVOLI
 3. MONICA MARIA ZULUAGA PELAEZ
 4. MARIANELA DAGATTI
-5. PABLO CONTRERAS
 
 
-## 📄 Licencia
 
-Este proyecto está licenciado bajo la Licencia MIT - ver el archivo [LICENSE](LICENSE) para más detalles.
+
 
 ## 📞 Soporte
 
