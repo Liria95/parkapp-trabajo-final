@@ -5,6 +5,9 @@ import * as Location from 'expo-location';
 import { Ionicons } from '@expo/vector-icons';
 import { theme } from '../../config/theme';
 import { AuthContext } from '../../components/shared/Context/AuthContext/AuthContext';
+import { API_CONFIG } from '../../config/api.config';
+
+
 
 interface Espacio {
   id: string;
@@ -28,43 +31,84 @@ export default function MapaAdmin({
   const authContext = useContext(AuthContext);
   const [espacios, setEspacios] = useState<Espacio[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingLocation, setLoadingLocation] = useState(true);
   const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | null>(null);
-  const [region, setRegion] = useState({
-    latitude: -27.4326,
-    longitude: -55.5375,
-    latitudeDelta: 0.05,
-    longitudeDelta: 0.05,
-  });
+  const [region, setRegion] = useState<{
+    latitude: number;
+    longitude: number;
+    latitudeDelta: number;
+    longitudeDelta: number;
+  } | null>(null);
+  const [mapReady, setMapReady] = useState(false);
 
   useEffect(() => {
-    obtenerUbicacion();
-    cargarEspacios();
+    inicializarMapa();
   }, []);
 
-  const obtenerUbicacion = async () => {
-    if (!showUserLocation) return;
+  const inicializarMapa = async () => {
+    setLoading(true);
+    setLoadingLocation(true);
+    
+    // SIEMPRE obtener ubicación del dispositivo primero
+    const ubicacionObtenida = await obtenerUbicacion();
+    
+    if (ubicacionObtenida) {
+      // Luego cargar espacios
+      await cargarEspacios();
+    }
+    
+    setLoading(false);
+  };
 
+  const obtenerUbicacion = async (): Promise<boolean> => {
     try {
+      console.log('🔍 Solicitando permisos de ubicación...');
       const { status } = await Location.requestForegroundPermissionsAsync();
+      
       if (status !== 'granted') {
-        console.log('Permiso de ubicación denegado');
-        return;
+        console.log('❌ Permiso de ubicación denegado');
+        Alert.alert(
+          'Permiso requerido',
+          'Se necesita acceso a la ubicación para mostrar el mapa correctamente'
+        );
+        setLoadingLocation(false);
+        setLoading(false);
+        return false;
       }
 
-      const location = await Location.getCurrentPositionAsync({});
+      console.log('📍 Obteniendo ubicación del dispositivo...');
+      const location = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.Balanced,
+      });
+      
       const userCoords = {
         latitude: location.coords.latitude,
         longitude: location.coords.longitude,
       };
 
+      console.log('✅ Ubicación obtenida:', userCoords);
+      
       setUserLocation(userCoords);
-      setRegion({
+      
+      // SIEMPRE centrar mapa en ubicación del dispositivo
+      const newRegion = {
         ...userCoords,
-        latitudeDelta: 0.05,
-        longitudeDelta: 0.05,
-      });
+        latitudeDelta: 0.02,
+        longitudeDelta: 0.02,
+      };
+      
+      setRegion(newRegion);
+      setLoadingLocation(false);
+      
+      console.log('✅ Región del mapa establecida:', newRegion);
+      return true;
+      
     } catch (error) {
-      console.error('Error al obtener ubicación:', error);
+      console.error('❌ Error al obtener ubicación:', error);
+      Alert.alert('Error', 'No se pudo obtener la ubicación del dispositivo');
+      setLoadingLocation(false);
+      setLoading(false);
+      return false;
     }
   };
 
@@ -72,18 +116,19 @@ export default function MapaAdmin({
     const token = authContext?.state.token;
     
     if (!token) {
-      console.log('No hay token disponible');
+      console.log('❌ No hay token disponible');
       setLoading(false);
       return;
     }
 
     try {
       setLoading(true);
-      console.log('Cargando espacios para mapa admin...');
+      console.log('🔄 Cargando espacios para mapa admin...');
 
-      // Obtener todos los espacios sin filtro de ubicación
-      const backendUrl = 'http://192.168.1.6:3000'; // Ajusta tu URL
+      const backendUrl = API_CONFIG.BASE_URL;; 
       const url = `${backendUrl}/api/parking-spaces/available`;
+
+      console.log('📡 URL:', url);
 
       const response = await fetch(url, {
         method: 'GET',
@@ -93,18 +138,42 @@ export default function MapaAdmin({
         },
       });
 
-      const data = await response.json();
+      console.log('📥 Response status:', response.status);
 
-      if (data.success && data.espacios) {
-        console.log('Espacios cargados:', data.espacios.length);
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('❌ Error del servidor:', errorText);
+        throw new Error(`HTTP ${response.status}: ${errorText}`);
+      }
+
+      const data = await response.json();
+      console.log('📦 Data recibida:', JSON.stringify(data, null, 2));
+
+      if (data.success && data.espacios && data.espacios.length > 0) {
+        console.log('✅ Espacios cargados:', data.espacios.length);
+        console.log('📍 Primer espacio:', data.espacios[0]);
         setEspacios(data.espacios);
+        
+        // NO centrar en espacios, mantener la ubicación del dispositivo
+        console.log('Espacios listos, mapa mantiene ubicación del dispositivo');
       } else {
-        console.log('No se encontraron espacios');
+        console.log('⚠️ No se encontraron espacios en la respuesta');
+        console.log('Data completa:', data);
         setEspacios([]);
       }
-    } catch (error) {
-      console.error('Error al cargar espacios:', error);
-      Alert.alert('Error', 'No se pudieron cargar los espacios');
+    } catch (error: any) {
+      console.error('❌ ERROR al cargar espacios:', error);
+      console.error('Error message:', error.message);
+      console.error('Error stack:', error.stack);
+      
+      Alert.alert(
+        'Error al cargar espacios',
+        `${error.message}\n\nVerifica:\n1. La IP del backend\n2. Que el servidor esté corriendo\n3. Tu conexión a la red`,
+        [
+          { text: 'Reintentar', onPress: () => cargarEspacios() },
+          { text: 'Cancelar', style: 'cancel' }
+        ]
+      );
     } finally {
       setLoading(false);
     }
@@ -112,6 +181,9 @@ export default function MapaAdmin({
 
   const handleRefresh = () => {
     cargarEspacios();
+    if (showUserLocation) {
+      obtenerUbicacion();
+    }
   };
 
   const handleMarkerPress = (espacio: Espacio) => {
@@ -122,8 +194,27 @@ export default function MapaAdmin({
         `Espacio ${espacio.numero}`,
         `Ubicación: ${espacio.ubicacion}\n` +
         `Tarifa: $${espacio.tarifaPorHora}/hora\n` +
-        `Estado: ${espacio.status === 'available' ? 'Disponible' : 'Ocupado'}`
+        `Estado: ${
+          espacio.status === 'available' 
+            ? 'Disponible' 
+            : espacio.status === 'occupied' 
+            ? 'Ocupado' 
+            : 'Mantenimiento'
+        }`
       );
+    }
+  };
+
+  const centrarEnUbicacion = async () => {
+    if (userLocation) {
+      setRegion({
+        ...userLocation,
+        latitudeDelta: 0.02,
+        longitudeDelta: 0.02,
+      });
+    } else {
+      // Si no hay ubicación guardada, obtenerla de nuevo
+      await obtenerUbicacion();
     }
   };
 
@@ -140,11 +231,13 @@ export default function MapaAdmin({
     }
   };
 
-  if (loading) {
+  if (loading || loadingLocation || !region) {
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color={theme.colors.primary} />
-        <Text style={styles.loadingText}>Cargando mapa...</Text>
+        <Text style={styles.loadingText}>
+          {loadingLocation ? 'Obteniendo tu ubicación...' : 'Cargando espacios...'}
+        </Text>
       </View>
     );
   }
@@ -156,8 +249,9 @@ export default function MapaAdmin({
         style={styles.map}
         region={region}
         onRegionChangeComplete={setRegion}
-        showsUserLocation={showUserLocation}
-        showsMyLocationButton={showUserLocation}
+        onMapReady={() => setMapReady(true)}
+        showsUserLocation={true}
+        showsMyLocationButton={false}
       >
         {espacios.map((espacio) => (
           <Marker
@@ -167,21 +261,17 @@ export default function MapaAdmin({
               longitude: espacio.longitude,
             }}
             onPress={() => handleMarkerPress(espacio)}
-            pinColor={getMarkerColor(espacio.status)}
           >
             <View style={styles.markerContainer}>
               <View style={[styles.marker, { backgroundColor: getMarkerColor(espacio.status) }]}>
-                <Ionicons
-                  name={espacio.status === 'available' ? 'checkmark' : 'close'}
-                  size={16}
-                  color="white"
-                />
+                <Text style={styles.markerText}>{espacio.numero}</Text>
               </View>
             </View>
           </Marker>
         ))}
       </MapView>
 
+      {/* Botón para refrescar */}
       <TouchableOpacity
         style={styles.refreshButton}
         onPress={handleRefresh}
@@ -189,10 +279,19 @@ export default function MapaAdmin({
         <Ionicons name="refresh" size={24} color="white" />
       </TouchableOpacity>
 
+      {/* Botón para centrar en ubicación */}
+      <TouchableOpacity
+        style={styles.locationButton}
+        onPress={centrarEnUbicacion}
+      >
+        <Ionicons name="locate" size={24} color="white" />
+      </TouchableOpacity>
+
+      {/* Leyenda */}
       <View style={styles.legend}>
         <View style={styles.legendItem}>
           <View style={[styles.legendDot, { backgroundColor: '#4CAF50' }]} />
-          <Text style={styles.legendText}>Disponible</Text>
+          <Text style={styles.legendText}>Libre</Text>
         </View>
         <View style={styles.legendItem}>
           <View style={[styles.legendDot, { backgroundColor: '#F44336' }]} />
@@ -202,6 +301,13 @@ export default function MapaAdmin({
           <View style={[styles.legendDot, { backgroundColor: '#FFC107' }]} />
           <Text style={styles.legendText}>Mantenimiento</Text>
         </View>
+      </View>
+
+      {/* Contador de espacios */}
+      <View style={styles.counter}>
+        <Text style={styles.counterText}>
+          {espacios.length} espacios totales
+        </Text>
       </View>
     </View>
   );
@@ -230,9 +336,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   marker: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 2,
@@ -243,6 +349,11 @@ const styles = StyleSheet.create({
     shadowRadius: 3,
     elevation: 5,
   },
+  markerText: {
+    color: 'white',
+    fontSize: 10,
+    fontWeight: 'bold',
+  },
   refreshButton: {
     position: 'absolute',
     bottom: 80,
@@ -251,6 +362,22 @@ const styles = StyleSheet.create({
     height: 56,
     borderRadius: 28,
     backgroundColor: theme.colors.primary,
+    justifyContent: 'center',
+    alignItems: 'center',
+    elevation: 5,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+  },
+  locationButton: {
+    position: 'absolute',
+    bottom: 150,
+    right: 16,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: theme.colors.success,
     justifyContent: 'center',
     alignItems: 'center',
     elevation: 5,
@@ -287,5 +414,19 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: theme.colors.dark,
     fontWeight: '500',
+  },
+  counter: {
+    position: 'absolute',
+    top: 16,
+    right: 16,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+  },
+  counterText: {
+    color: 'white',
+    fontSize: 12,
+    fontWeight: 'bold',
   },
 });
